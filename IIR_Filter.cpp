@@ -2,7 +2,7 @@
 
 IIRFilter::IIRFilter(const std::vector<StkFloat>& numerator, const std::vector<StkFloat>& denominator)
     : filter_(numerator, denominator),
-    output_(20, 1)   // You can adjust the size and channels as needed
+    output_(20, 1)   // These can be adjsuted
 {
     output_[0] = 1.0;
 }
