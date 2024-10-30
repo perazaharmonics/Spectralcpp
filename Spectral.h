@@ -5,8 +5,6 @@
 // Author: J. Enrique Peraza, JEP, enriperazavelazquez@gmail.com
 // =======================================================================================
 
-
-
 #ifndef SPECTRAL_H
 #define SPECTRAL_H
 
