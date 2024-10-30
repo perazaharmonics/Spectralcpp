@@ -1,3 +1,12 @@
+// ====================================================================================
+// Description: A collection of common Spectral Transforms and manipulation methods.
+//   used for various forms of Digital Signal Processing.
+//
+// Author: J. Enrique Peraza, JEP, enriperazavelazquez@gmail.com
+// =======================================================================================
+
+
+
 #ifndef SPECTRAL_H
 #define SPECTRAL_H
 
