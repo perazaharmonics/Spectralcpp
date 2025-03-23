@@ -533,54 +533,105 @@ std::vector<std::vector<T>> EigenSpectral<T>::PCA(
   return principalComponents;           // Return the principal components.
 }  
 
-// Phase Unwrapping
-// Phase unwrapping is the process of removing the 2*pi phase jumps that occur in
-// wrapped phase data. Wrapped phase data is the result of taking the phase of a
-// complex signal and mapping it to the interval [-pi, pi]. This mapping causes
-// phase values to wrap around when they exceed pi or -pi, resulting in discontinuities
-// in the phase data.
-// Phase unwrapping algorithms aim to reconstruct the continuous phase from the wrapped
-// phase data by identifying and removing the phase jumps. This is typically done by
-// detecting the phase discontinuities and adding or subtracting multiples of 2*pi to
-// the phase values to remove the jumps.
-// The unwrapped phase can be used to extract more accurate phase information from the
-// signal, which is important in applications such as interferometry, radar, and
-// magnetic resonance imaging.
+/**
+ * @brief Unwraps a sequence of phase angles to produce a continuous phase progression.
+ *
+ * This function removes 2π ambiguities from a wrapped phase vector by detecting 
+ * discontinuities between consecutive phase samples and compensating for them. 
+ * It ensures that the difference between successive phase values in the output 
+ * does not exceed π radians in magnitude (i.e., no jumps larger than 180 degrees), 
+ * by adding or subtracting the appropriate multiple of 2π.
+ *
+ * The algorithm is based on Itoh's 1D phase unwrapping method [oai_citation_attribution:4‡pmc.ncbi.nlm.nih.gov](https://pmc.ncbi.nlm.nih.gov/articles/PMC3156002/#:~:text=Itoh%E2%80%99s%20method%20%28Itoh%2C%201982%29,Then%20it%20wraps):
+ * starting from the first phase value (assumed to be within [-π, π)), it iteratively
+ * adds or subtracts 2π whenever a jump > π (or < -π) is encountered, effectively 
+ * "unwrapping" the phase. This is extended to handle large jumps that may span 
+ * multiple 2π intervals, which can occur with under-sampled signals or abrupt 
+ * phase shifts in eigenvector data.
+ *
+ * **Assumptions:** The input vector `phaseData` contains phase angles (in radians) 
+ * that are *wrapped* to a principal range, typically [-π, π) or [0, 2π). The function 
+ * does not internally wrap the input, so inputs outside these ranges should be 
+ * normalized beforehand. The output will be a continuous phase sequence where any 
+ * 2π discontinuities are removed. Note that true phase changes of ±π (180°) 
+ * remain, as they are inherently ambiguous (the algorithm chooses not to alter 
+ * differences of exactly π to avoid arbitrary shifts).
+ *
+ * **Edge Cases:** 
+ * - If `phaseData` is empty, the result is an empty vector.
+ * - If `phaseData` has a single element, it is returned as-is (no unwrapping needed).
+ * - Large phase discontinuities (> 2π) between samples are handled by applying multiple 
+ *   2π corrections iteratively until the jump is within [-π, π]. This means even if the 
+ *   phase suddenly jumps several revolutions, the algorithm will unwrap it to the nearest 
+ *   equivalent angle, preserving continuity.
+ * - Noisy data: Small oscillations below the π threshold are left untouched. If noise causes 
+ *   a jump slightly over the threshold, a 2π correction will be applied (which may or may not 
+ *   reflect the true continuous phase – users should pre-filter noise if needed). The algorithm 
+ *   uses a threshold of π radians for jumps (with a tiny epsilon margin) to decide unwrapping, 
+ *   aligning with the standard MATLAB/NumPy approach [oai_citation_attribution:5‡ncl.ucar.edu](https://www.ncl.ucar.edu/Document/Functions/Contributed/unwrap_phase.shtml#:~:text=This%20function%20mimics%20the%20behavior,jump%20tolerance%20of%20pi%20radians).
+ *
+ * @param phaseData  Vector of wrapped phase values (in radians) to be unwrapped.
+ * @return std::vector<T>  New vector of the same length with unwrapped phase values.
+ */
 template <typename T>
-std::vector<T> EigenSpectral<T>::UnwrapPhase(void)
+std::vector<T> EigenSpectral<T>::UnwrapPhase(const std::vector<T>& phaseData) const
 {
-  auto [eigenvalues, eigenvectors] = GetEigenDecomposition(); // Eigenvectors from Cov(signal)
-  const std::vector<T>& principalEigenvector = eigenvectors[0]; // Leading eigenvector
-  size_t timeLength = signalMatrix[0].size();// Number of time samples
-  size_t numSources = signalMatrix.size();// Number of sources (dimensions)
-  std::vector<T> phase(timeLength, 0.0); // Initialize wrapped phase array
-  // Project signal vector at each time index onto the principal eigenvector
-  for (size_t t = 0; t < timeLength; ++t)
-  {
-    T dotProduct = 0.0;                 // Initialize the dot product var.
-    for (size_t j = 0; j < numSources; ++j)// For each signal source
-    {                                   // Get the dot product of the signal vector and the principal eigenvector.
-      dotProduct += signalMatrix[j][t] * principalEigenvector[j];
-    }                                   // Done with dot product.
-    // Calculate the phase at each time index
-    phase[t] = std::atan2(std::sin(dotProduct), std::cos(dotProduct)); // Wrap to [-π, π]
-  }                                    // Done calculating phase at time index.
-  // Unwrap the phase (remove 2π jumps)
-  std::vector<T> unwrappedPhase(timeLength);// Initialize the unwrapped phase array
-  unwrappedPhase[0] = phase[0];         // Set the first phase value
-  for (size_t i = 1; i < timeLength; ++i)// For each time index
-  {                                     // Unwrap the phase
-    T delta = phase[i] - phase[i - 1];  // Compute the phase difference
-    if (delta > M_PI)                   // If the phase difference is greater than π
-      delta -= 2 * M_PI;                // Subtract 2π
-    else if (delta < -M_PI)             // If the phase difference is less than -π
-      delta += 2 * M_PI;                // Add 2π
-    unwrappedPhase[i] = unwrappedPhase[i - 1] + delta; // Unwrap the phase
-  }                                     // Done unwrapping phase
-  phaseUnwrapped = unwrappedPhase;      // Store for later retrieval
-  return unwrappedPhase;                // Return the unwrapped phase
-}
+    std::vector<T> unwrapped;
+    unwrapped.reserve(phaseData.size());  // reserve output size for efficiency
 
+    if (phaseData.empty()) {
+        return unwrapped;  // return empty result for empty input
+    }
+
+    // Constants for 2π and π (cast to T to match vector's value type).
+    const T TWO_PI = static_cast<T>(2 * M_PI);
+    const T PI     = static_cast<T>(M_PI);
+    const T TOL    = static_cast<T>(1e-9);  // small tolerance to avoid floating-point edge issues
+
+    // Start unwrapping from the first value.
+    unwrapped.push_back(phaseData[0]);  
+    T offset = 0;  
+    T prevPhase = phaseData[0];  // last input phase value seen (for computing difference)
+
+    // Iterate through the phase data, unwrapping each subsequent value.
+    for (size_t i = 1; i < phaseData.size(); ++i) {
+        T currPhase = phaseData[i];
+        // Calculate raw phase difference between current and previous sample
+        T diff = currPhase - prevPhase;
+
+        // Check for discontinuities greater than π radians.
+        if (diff > PI + TOL) {
+            // **Positive jump exceeds +π**: we likely wrapped downward (e.g., went from just below +π to just above -π).
+            // Compute how many 2π to subtract to reduce the jump. At least one 2π will be subtracted.
+            // We use a while-loop to handle cases of multiple wraps (difference much larger than π).
+            while (diff > PI + TOL) {
+                // Subtract 2π from the current offset to compensate for a wrap-around.
+                offset -= TWO_PI;
+                diff   -= TWO_PI;
+            }
+            // After this loop, diff should be <= π (the jump has been reduced by the necessary 2π multiples).
+        }
+        else if (diff < -PI - TOL) {
+            // **Negative jump exceeds -π**: likely wrapped upward (e.g., from just above -π to just below +π).
+            while (diff < -PI - TOL) {
+                // Add 2π to the offset to compensate for the negative wrap-around.
+                offset += TWO_PI;
+                diff   += TWO_PI;
+            }
+            // Now diff should be >= -π.
+        }
+
+        // Compute the unwrapped phase for the current sample by applying the accumulated offset.
+        // The offset is zero most of the time and changes only when a wrap is detected, ensuring continuity.
+        T unwrappedPhase = currPhase + offset;
+        unwrapped.push_back(unwrappedPhase);
+
+        // Update the reference for previous phase (leave `prevPhase` as the original wrapped phase of the last sample).
+        prevPhase = currPhase;
+    }
+
+    return unwrapped;
+}
 
 // Matrix operation helper functions
 template <typename T>
