@@ -162,8 +162,6 @@ EigenSpectral<T>::EigenSpectral(
   signalSources=signalDimension;        // Set the signal sources.
   frequencySpacing=1;                   // Set the frequency spacing.
   retainedComponents=signalSources;     // Set the retained components.
-  maxIterations=100;                    // Set the maximum number of iterations.
-  tolerance=1e-6;                       // Set the tolerance.
   eigenvectors.resize(signalSources, std::vector<T>(signalSources, 0.0));
   ComputeCovarianceMatrix();            // Compute the covariance matrix.
   ComputeEigenDecomposition();                 // Compute the eigen decomposition.
