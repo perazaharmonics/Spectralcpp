@@ -691,7 +691,21 @@ T EigenSpectral<T>::ComputeDeterminant(
   }                                     // Done computing the determinant.
   return det;                           // Return the determinant.
 }                                       // ------- ComputeDeterminant -----------
-
+// Compute the dot product of two vectors.
+// The dot product is defined as: sum(a_i * b_i)
+// It measures the similarity (projection) between two vectors.
+template <typename T>
+T EigenSpectral<T>::VectorDotProduct(
+  const std::vector<T> &v1,             // Vector 1
+  const std::vector<T> &v2)             // Vector 2
+{                                       // ------- VectorDotProduct -----------
+  T sum{0.0};                           // Initialize the sum
+  for (size_t i = 0; i < v1.size(); ++i)// For each element of the vectors
+  {
+    sum += v1[i] * v2[i];               // Accumulate the product
+  }                                     // Done traversing both vectors
+  return sum;                           // Return the dot product
+}                                       // ------- VectorDotProduct -----------
 // The Adjunt matrix is the transpose of the cofactor matrix.
 // The cofactor matrix is the matrix of determinants of the minors of the original matrix.
 // The minor of a matrix is the determinant of the matrix obtained by removing the ith row
