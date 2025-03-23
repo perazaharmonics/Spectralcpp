@@ -213,34 +213,74 @@ void EigenSpectral<T>::ComputeCovarianceMatrix (void)
 // positive definite. The method is used to compute the eigenvectors and eigenvalues of
 // the covariance matrix of the signal, which can be used to estimate the frequencies of
 // the signal sources.
+// Compute the eigen decomposition of the covariance matrix using the power iteration
+// method. The power iteration method is an iterative algorithm for approximating the
+// dominant eigenvalues and eigenvectors of a matrix. For each eigenvector, we initialize
+// a random vector and iteratively multiply it by the covariance matrix to converge to the
+// dominant direction. The associated eigenvalue is computed using the Rayleigh quotient.
+// The result is a pair of vectors: one for eigenvalues and one for eigenvectors.
 template <typename T>
-void EigenSpectral<T>::ComputeEigenDecomposition(void)          
-{                                       // ------- EigenDecomposition -----------
-  int size = covarianceMatrix.size();   // Size of the covariance matrix.
-  std::vector<T> eigenvalues(size, 0.0); // Initialize the eigenvalues.
-  std::vector<std::vector<T>> eigenvectors(size, std::vector<T>(size, 0.0)); // Initialize the eigenvectors.
-  int iters = GetMaxIterations();       // Get the maximum number of iterations.
-  const double tol = GetTolerance();    // Get the tolerance.
-  // Calculate the eigenvectors and eigenvalues.
-  for (int i = 0; i < size; i++)        // For the size of the Cov(signal)
-  {
-    std::vector<T> b(size,static_cast<T>(rand())/RAND_MAX); // Initialize the vector b.
-    for (int j = 0; j < iters; j++)     // For the maximum number of iterations.
-    {                                   // Normalize the vector b.
-      b = MultiplyMatrixVector(covarianceMatrix, b); // Multiply the matrix by the vector.
-      T norm = VectorNorm(b);           // Compute the vector norm.
-      if (norm < tol)                   // Norm less than tolerance?
-        break;                          // Yes, break from the loop.
-      b = NormalizeVector(b);           // Normalize the vector.
-    }                                   // End of the loop over the iterations.
-    eigenvalues[i] = VectorNorm(b);     // Compute the eigenvalues.
-    eigenvectors[i] = b;                // Compute the eigenvectors.
-  }                                     // End of the loop over the covariance matrix.
-  Orthonormalize(eigenvectors);         // Orthonormalize the eigenvectors.
-  orthonormalEigenvectors=eigenvectors; // Store the orthonormal eigenvectors.
-  eigenDecomposition = std::make_pair(eigenvalues, eigenvectors); // Return the eigenvalues and eigenvectors.
-}                                       // ------- EigenDecomposition -----------
+void EigenSpectral<T>::ComputeEigenDecomposition(void)
+{                                       // ------- ComputeEigenDecomposition -----------
+  int size = covarianceMatrix.size();   // Size of the covariance matrix (square matrix)
+  std::vector<T> eigenvalues(size, 0.0); // Initialize eigenvalue storage
+  std::vector<std::vector<T>> eigenvectors(size, std::vector<T>(size, 0.0)); // Eigenvector matrix
+  int iters = GetMaxIterations();       // Max number of iterations allowed
+  const double tol = GetTolerance();    // Convergence tolerance
 
+  // Loop over the number of eigenvectors to compute
+  for (int i = 0; i < size; i++)
+  {
+    std::vector<T> b(size, 0.0);        // Initialize a random starting vector
+    for (int j = 0; j < size; ++j)
+      b[j] = static_cast<T>(rand()) / RAND_MAX;
+
+    // Normalize the initial vector
+    b = NormalizeVector(b);
+
+    std::vector<T> prev_b(size, 0.0);   // Previous vector for convergence check
+
+    for (int j = 0; j < iters; j++)     // Iterate until convergence or max iterations
+    {
+      prev_b = b;                       // Store previous vector
+
+      // Multiply covariance matrix by vector
+      b = MultiplyMatrixVector(covarianceMatrix, b);
+
+      // Normalize the result
+      b = NormalizeVector(b);
+
+      // Check convergence by computing the difference norm
+      T diff = 0.0;
+      for (int k = 0; k < size; ++k)
+        diff += std::pow(b[k] - prev_b[k], 2);
+
+      if (std::sqrt(diff) < tol)       // If converged, break
+        break;
+    }
+
+    // Compute Rayleigh quotient: λ = (b^T * A * b)
+    std::vector<T> Ab = MultiplyMatrixVector(covarianceMatrix, b); // A * b
+    T lambda = VectorDotProduct(b, Ab); // b^T * (A * b)
+    eigenvalues[i] = lambda;           // Store eigenvalue
+    eigenvectors[i] = b;               // Store eigenvector
+
+    // Deflate the covariance matrix by removing the contribution of this eigenpair
+    // A = A - λ * (v * v^T)
+    std::vector<std::vector<T>> outer(size, std::vector<T>(size));
+    for (int r = 0; r < size; ++r)
+      for (int c = 0; c < size; ++c)
+        outer[r][c] = lambda * b[r] * b[c]; // Compute λ * (v * v^T)
+
+    covarianceMatrix = SubtractMatrices(covarianceMatrix, outer); // Deflation step
+  }
+
+  // Store results
+  eigenDecomposition = std::make_pair(eigenvalues, eigenvectors); // Store eigendecomposition
+  this->eigenvalues = eigenvalues;            // Store eigenvalues as class member
+  this->eigenvectors = eigenvectors;          // Store eigenvectors as class member
+  orthonormalEigenvectors = eigenvectors;     // Assume orthonormal after normalization
+}                                       // ------- ComputeEigenDecomposition -----------
 // MUSIC algorithm for phase estimation. Used to estimate the frequencies
 // of multiple signals in the presence of noise. Using the eigen-decomposition
 // of the covariance matrix of the signal. By separating the signal subspace
