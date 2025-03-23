@@ -267,21 +267,64 @@ std::vector<T> EigenSpectral<T>::MUSICPhaseEstimation(
   int signalSources,                   // Number of signal sources
   double frequencySpacing)             // Frequency spacing
 {                                      // ------- MUSICPhaseEstimation -----------
-  auto [eigenvalues,eigenvectors]=GetEigenDecomposition(); // Compute the eigenvalues and eigenvectors.
-  int noiseSubspaceDim=eigenvalues.size() - signalSources; // Compute the noise subspace dimension.
-  std::vector<T> pwrSpectrum(GetMaxIterations(),0.0); // Initialize the power spectrum.
-  for (int i=0;i<GetMaxIterations();i++)// For the size of the power spectrum.
-  {
-    double sum{0.0};                    // Initialize the sum.
-    for (int j=0;j<noiseSubspaceDim;j++)// For the noise subspace dimensional size.
-    {                                   // Compute the sum of 1/eigenvalues.
-      sum+=1.0/eigenvalues[j];          // Calculate the sum of 1/eigenvalues.
-    }                                   // End of the loop over the noise subspace.
-    pwrSpectrum[i]=1.0/sum;             // Compute the power spectrum.
-  }                                     // End of the loop over the power spectrum.
-  return pwrSpectrum;                   // Return the power spectrum.
-}                                       // ------- MUSICPhaseEstimation -----------
+  auto [eigenvalues,eigenvectors]=GetEigenDecomposition(); // Get the eigen decomposition
+  const int dim=signalMatrix.size();   // Get the dimension of the signal
+  const int N=GetMaxIterations();      // Number of frequency steps in the spectrum
+  const int noiseDim=dim - signalSources; // Dimensionality of noise subspace
 
+  std::vector<T> pwrSpectrum(N, 0.0);  // Initialize the power spectrum
+
+  // Sanity check: return flat spectrum if invalid setup
+  if (signalSources >= dim || eigenvectors.empty()) 
+  {
+    std::cerr << "[ERROR] MUSIC: signalSources too large or empty eigenvectors.\n";
+    return pwrSpectrum;                // Return all-1s power spectrum
+  }
+
+  // Build noise subspace matrix E_n from eigenvectors[signalSources..]
+  std::vector<std::vector<T>> En(noiseDim); // Initialize noise subspace
+  for (int j = 0; j < noiseDim; ++j)
+  {
+    En[j] = eigenvectors[signalSources + j]; // Copy the noise eigenvectors
+  }
+
+  // Evaluate MUSIC spectrum over N frequency bins
+  for (int i = 0; i < N; ++i) 
+  {
+    T f = i * frequencySpacing;        // Current test frequency
+    std::vector<std::complex<T>> a(dim); // Complex steering vector
+
+    // Build the complex steering vector: a(f) = [1, e^{-j2πf}, ..., e^{-j2πf(M-1)}]^T
+    for (int k = 0; k < dim; ++k) 
+    {
+      T phase = -2.0 * M_PI * f * k;   // Compute phase angle
+      a[k] = std::complex<T>(std::cos(phase), std::sin(phase)); // e^{-j2πfk}
+    }
+
+    // Project steering vector onto noise subspace
+    std::complex<T> denom(0.0, 0.0);   // Accumulator for projection magnitude
+
+    for (int j = 0; j < noiseDim; ++j) // For each noise basis vector
+    {
+      std::complex<T> dot(0.0, 0.0);   // Inner product accumulator
+
+      for (int k = 0; k < dim; ++k)    // Dot product a^H * En[j]
+      {
+        dot += std::conj(a[k]) * En[j][k]; // Hermitian projection
+      }
+
+      denom += dot * std::conj(dot);   // Accumulate |a^H * En[j]|^2
+    }
+
+    // Compute MUSIC spectrum value at this frequency
+    if (std::abs(denom) > 1e-12)       // Avoid division by zero
+      pwrSpectrum[i] = 1.0 / std::abs(denom); // Power is inverse of projection magnitude
+    else
+      pwrSpectrum[i] = 0.0;            // Otherwise, set to zero
+  }                                     // Done looping over frequency bins
+
+  return pwrSpectrum;                   // Return MUSIC power spectrum
+}                                       // ------- MUSICPhaseEstimation -----------
 template <typename T>
 // ESPRIT algorithm for phase estimation. Used to estimate the freq of signal in the
 // presence of noise. Useful in applications such as Direction of Arrival (DOA) estimation
