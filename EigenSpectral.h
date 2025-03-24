@@ -186,17 +186,37 @@ void EigenSpectral<T>::ComputeCovarianceMatrix (void)
   }  
   int rows = signalMatrix.size();       // Number of rows in the signal matrix.
   int cols = signalMatrix[0].size();    // Number of columns in the signal matrix.
+  auto s=signalMatrix;                  // Our signal matrix.
+  // Compute the mean of each row (signal)
+  std::vector<T> means(rows,0.0);       // Where to store the mean of each signal.
+  for (int i=0;i<rows;i++)              // For each signal...
+  {                                     // Compute the mean.
+    T sum{0.0};                         // Where to store the sum of the elements.
+    for (int k=0;k<cols;k++)            // For the amount of samples in the signal.
+    {                                   // Begin to collect the sum of the samples.
+      sum+=s[i][k];                     // Sum the samples (cols) per signal (rows)
+    }                                   // Done aggregating the samples.
+    means[i]=sum/cols;                  // Calculate the mean.
+  }                                     // Done calculating the mean.
   covarianceMatrix.resize(rows, std::vector<T>(rows, 0.0)); // signals*signals
-  // Compute the covariance matrix.      //
-  for (int i=0;i<rows;i++)               // For the amount of columns of cov matrix
+  // --------------------------------- //
+  // Compute the covariance matrix. We must subtract each row's mean before
+  // taking the dos product. We also loop twice over the rows because each entry
+  // in the convariance matrix corresponds to a pair of signals (row i vs. row j)
+  // while the innermost loops sums over the samples (columns).
+  // ----------------------------------- //
+  for (int i=0;i<rows;i++)               // For the amount of signal sources (rows)
   {                                      // Compute the covariance matrix.
-    for (int j=0;j<rows;j++)             // For the amount of columns in this row
+    for (int j=0;j<rows;j++)             // For the amount of signal sources.
     {                                    // Compute pairwise conv between col(i) and col(j)
-      double sum{0.0};                   // Initialize the sum.
-      for (int k=0;k<cols;k++)           // For the amount of rows in the signal matrix.
+      T sum{0.0};                        // Initialize the sum.
+      for (int k=0;k<cols;k++)           // For the amount of samples (cols) in the matrix.
       {                                  // Compute sum of products el elements from col(i) and col(j)
-        sum+=signalMatrix[i][k]*signalMatrix[j][k]; // Sum the product of the elements.
+        T centered_i=s[i][k]-mean;       // Substract the mean from this signal's samples
+        T centered_j=s[j][k]-mean;       // Substract the mean from this signal's samples
+        sum+=centered_i*centered_j;      // Summate the products.
       }                                  // End of the loop over the rows.
+      // Sample covariance uses (cols -1)
       covarianceMatrix[i][j]=sum/(cols-1); // Compute the covariance matrix.
     }                                    // End of the loop over the columns.
   }                                      // End of the loop over the columns.
