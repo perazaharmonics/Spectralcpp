@@ -76,7 +76,7 @@ class EigenSpectral
     std::vector<std::vector<T>> PCA(int retainedComponents);
 
     // Graph-based Phase Unwrapping using eigenvectors.
-    std::vector<T> UnwrapPhase (void);
+    std::vector<T> UnwrapPhase (const std::vector<T>& phaseData);
 
     // Getter functions
     const inline std::vector<std::vector<T>>& GetSignalMatrix (void) const {return signalMatrix;}
