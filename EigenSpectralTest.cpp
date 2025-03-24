@@ -71,7 +71,7 @@ int main() {
   assert(pca[0].size() == signal[0].size());
 
   // --- Test 5: Phase Unwrapping ---
-  auto unwrapped = spectral.UnwrapPhase();
+  auto unwrapped = spectral.UnwrapPhase(signal[0]);
   std::cout << "[TEST] Unwrapped Phase:\n";
   spectral.PrintVector(unwrapped);
   assert(unwrapped.size() == signal[0].size());
