@@ -237,70 +237,74 @@ void EigenSpectral<T>::ComputeCovarianceMatrix (void)
 // magnitude, ensuring that the first eigenvectors represent the most significant signal
 // components. This ordering is essential for subspace methods such as PCA, MUSIC,
 // and ESPRIT, where separation of signal and noise relies on eigenvalue dominance.
+// Compute the eigen decomposition of the covariance matrix using the power iteration
+// method. This method estimates eigenvectors and eigenvalues one at a time by iteratively
+// multiplying a matrix by a vector until it converges in direction. The associated eigenvalue
+// is found using the Rayleigh quotient. After extracting the dominant eigenvector and eigenvalue,
+// their contribution is subtracted (deflated) from the covariance matrix so the next dominant
+// pair can be extracted. This process is repeated until all eigenpairs are computed. The method
+// assumes the matrix is symmetric and positive semi-definite.
 template <typename T>
 void EigenSpectral<T>::ComputeEigenDecomposition(void)
 {                                       // ------- ComputeEigenDecomposition -----------
-  int size = covarianceMatrix.size();   // Size of the covariance matrix (square matrix)
-  std::vector<T> eigenvalues(size, 0.0); // Initialize eigenvalue storage
-  std::vector<std::vector<T>> eigenvectors(size, std::vector<T>(size, 0.0)); // Eigenvector matrix
-  int iters = GetMaxIterations();       // Max number of iterations allowed
-  const double tol = GetTolerance();    // Convergence tolerance
+  auto [eVals, eVecs] = PowerIteration(maxIterations, tolerance); // Use PowerIteration
+  eigenDecomposition = std::make_pair(eVals, eVecs); // Store the eigendecomposition
+  eigenvalues = eVals;                  // Save the eigenvalues
+  eigenvectors = eVecs;                 // Save the eigenvectors
+  orthonormalEigenvectors = eVecs;      // Assume orthonormal for now
+}                                       // ------- ComputeEigenDecomposition -----------
 
-  for (int i = 0; i < size; i++)        // For each eigenvector to compute
-  {                                     // Begin computing eigenvector i
-    std::vector<T> b(size, 0.0);        // Initialize random starting vector
+// Perform power iteration to compute all eigenpairs of the covariance matrix.
+// This method estimates one eigenpair at a time, subtracting each contribution
+// from the matrix before finding the next (deflation).
+template <typename T>
+std::pair<std::vector<T>, std::vector<std::vector<T>>>
+EigenSpectral<T>::PowerIteration(int maxIterations, double tolerance)
+{                                       // ------- PowerIteration -----------
+  int size = covarianceMatrix.size();   // Matrix is square: size x size
+  std::vector<T> eigenvalues(size, 0.0); // Store eigenvalues
+  std::vector<std::vector<T>> eigenvectors(size, std::vector<T>(size, 0.0)); // Store eigenvectors
+  std::vector<std::vector<T>> A = covarianceMatrix; // Copy of matrix to deflate
+
+  for (int i = 0; i < size; ++i)        // For each eigenpair to compute
+  {
+    std::vector<T> b(size, 0.0);        // Random starting vector
     for (int j = 0; j < size; ++j)
       b[j] = static_cast<T>(rand()) / RAND_MAX;
 
-    b = NormalizeVector(b);             // Normalize initial vector
-    std::vector<T> prev_b(size, 0.0);   // Store previous iteration vector
+    b = NormalizeVector(b);             // Normalize initial guess
+    std::vector<T> prev_b(size, 0.0);   // Store previous guess
 
-    for (int j = 0; j < iters; j++)     // Begin Power Iteration
+    for (int iter = 0; iter < maxIterations; ++iter)
     {
-      prev_b = b;                       // Store current vector
-      b = MultiplyMatrixVector(covarianceMatrix, b); // Multiply matrix * vector
-      b = NormalizeVector(b);           // Normalize result
+      prev_b = b;                       // Save previous vector
+      b = MultiplyMatrixVector(A, b);  // Multiply by matrix
+      b = NormalizeVector(b);          // Normalize result
 
-      T diff = 0.0;                     // Track convergence delta
+      T diff = 0.0;                     // Check convergence
       for (int k = 0; k < size; ++k)
         diff += std::pow(b[k] - prev_b[k], 2);
 
-      if (std::sqrt(diff) < tol)       // Converged?
-        break;
+      if (std::sqrt(diff) < tolerance) break; // Converged
     }
 
-    std::vector<T> Ab = MultiplyMatrixVector(covarianceMatrix, b); // A * b
-    T lambda = VectorDotProduct(b, Ab); // Rayleigh quotient
+    std::vector<T> Ab = MultiplyMatrixVector(A, b); // A * b
+    T lambda = VectorDotProduct(b, Ab);  // Rayleigh quotient
+
     eigenvalues[i] = lambda;            // Store eigenvalue
     eigenvectors[i] = b;                // Store eigenvector
 
-    std::vector<std::vector<T>> outer(size, std::vector<T>(size)); // For deflation
+    // Deflate the matrix A = A - λ * (v * v^T)
+    std::vector<std::vector<T>> outer(size, std::vector<T>(size));
     for (int r = 0; r < size; ++r)
       for (int c = 0; c < size; ++c)
-        outer[r][c] = lambda * b[r] * b[c]; // λ * (v * v^T)
+        outer[r][c] = lambda * b[r] * b[c];
 
-    covarianceMatrix = SubtractMatrices(covarianceMatrix, outer); // Deflation
-  }                                     // Done computing all eigenvectors
-
-  // --- Sort eigenpairs in descending order by eigenvalue magnitude ---
-  std::vector<std::pair<T, std::vector<T>>> eigenpairs(size); // Pair each eigenvalue with its vector
-  for (int i = 0; i < size; ++i)
-    eigenpairs[i] = std::make_pair(eigenvalues[i], eigenvectors[i]);
-
-  std::sort(eigenpairs.begin(), eigenpairs.end(),
-            [](const auto& a, const auto& b) { return a.first > b.first; }); // Sort descending
-
-  for (int i = 0; i < size; ++i)
-  {
-    eigenvalues[i] = eigenpairs[i].first;   // Unpack sorted eigenvalue
-    eigenvectors[i] = eigenpairs[i].second; // Unpack sorted eigenvector
+    A = SubtractMatrices(A, outer);     // Update matrix for next iteration
   }
 
-  eigenDecomposition = std::make_pair(eigenvalues, eigenvectors); // Store sorted results
-  this->eigenvalues = eigenvalues;       // Update member storage
-  this->eigenvectors = eigenvectors;
-  orthonormalEigenvectors = eigenvectors;// Also store to orthonormal slot
-}                                       // ------- ComputeEigenDecomposition -----------
+  return std::make_pair(eigenvalues, eigenvectors); // Return all eigenpairs
+}                                       // ------- PowerIteration -----------
 
 Let me know if you’d like me to regenerate the full class with this update applied inline.
 // MUSIC algorithm for phase estimation. Used to estimate the frequencies
