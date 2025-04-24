@@ -222,6 +222,17 @@ void EigenSpectral<T>::ComputeCovarianceMatrix (void)
   }                                      // End of the loop over the columns.
 }                                        // ----- ComputeCovarianceMatrix -----
 
+
+
+// --------------------------------------------------------------------------------
+// This is actually much harder than I originally thought. I need to
+// make a separate class for the Generalized Eigenvalue Problem. This class would
+// and should take tha pattern of a dispatcher, where different algorithms are applied
+// depending on the conditions defined by the type of input matrix to ensure numerical
+// stability and flexibility to handle all cases. Thus yielding two
+// new classes. One for Linear Algebraic methods, and another just for the Generalized
+// Eigenvalue problem. Finally, the third class. EigenSpectral. Which also needs the 
+// ---------------------------------------------------------------------------------
 // Compute the eigen decomposition of the covariance matrix using the power iteration
 // method, followed by sorting the eigenpairs by descending eigenvalue magnitude.
 // The power iteration method is an iterative approach for computing the dominant
@@ -244,7 +255,9 @@ void EigenSpectral<T>::ComputeCovarianceMatrix (void)
 // their contribution is subtracted (deflated) from the covariance matrix so the next dominant
 // pair can be extracted. This process is repeated until all eigenpairs are computed. The method
 // assumes the matrix is symmetric and positive semi-definite.
-template <typename T>
+
+
+/*template <typename T>
 void EigenSpectral<T>::ComputeEigenDecomposition(void)
 {                                       // ------- ComputeEigenDecomposition -----------
   auto [eVals, eVecs] = PowerIteration(maxIterations, tolerance); // Use PowerIteration
@@ -305,8 +318,8 @@ EigenSpectral<T>::PowerIteration(int maxIterations, double tolerance)
 
   return std::make_pair(eigenvalues, eigenvectors); // Return all eigenpairs
 }                                       // ------- PowerIteration -----------
+*/
 
-Let me know if you’d like me to regenerate the full class with this update applied inline.
 // MUSIC algorithm for phase estimation. Used to estimate the frequencies
 // of multiple signals in the presence of noise. Using the eigen-decomposition
 // of the covariance matrix of the signal. By separating the signal subspace
