@@ -132,7 +132,7 @@ public:
       for (const auto& elem:mat[i])      // For every element in the matrix.
         sum+=elem*elem;                  // Add the square of the element to the result.
         // Divide by the number of rowsxcolums
-    return sum/static_cast<T>(mat.size()*mat[0].size());// Divide energy by all elements of the matrix.
+    return sum/static_cast<T>(rows*cols);// Divide energy by all elements of the matrix.
   }                                      // ------- FrobeniusAveragePower ----------- //
   // Copy and move assignment operators:
   Matrices& operator=(const Matrices& rhs) = default; // Copy assignment operator.
