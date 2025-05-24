@@ -120,8 +120,8 @@ public:
         sum+=elem*elem;                 // Add the square of the element to the sum.
     return std::sqrt(sum);              // Return the square root of the sum as the Frobenius norm.
   }                                     // ----------- FrobeniusNorm ------------ //
-  // Get the average power of all signals (the row or col vectors
-  // in the signal with the elements representing the samples
+  // Get the average power of all signals. The row or col vectors
+  // in the representing each a signal with the elements representing the samples
   // of the signals.
   T FrobeniusAveragePower() const
   {
