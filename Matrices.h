@@ -130,9 +130,12 @@ public:
     T sum{};                             // Initialize sum to zero.
     size_t N=rows;                       // Get the number of rows in the matrix.
     for (size_t i=0;i<N;i++)             // Loop through each row in the matrix.
+    {
+      T row_energy{};                    // The energy per row.
       for (const auto& elem:mat[i])      // For every element in the matrix.
-        sum+=elem*elem;                  // Add the square of the element to the result.
-        // Divide by the number of rowsxcolums
+        row_energy+=elem*elem;           // Add the square of the element to the result.
+      sum+=row_energy/static_cast<T>(cols);// Aggregate the energy off the signals.
+    }                                    // Done aggregating sum of energy in signal arremsbly
     return sum/static_cast<T>(rows*cols);// Divide energy by all elements of the matrix.
   }                                      // ------- FrobeniusAveragePower ----------- //
   // Copy and move assignment operators:
