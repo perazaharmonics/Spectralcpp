@@ -171,14 +171,14 @@ public:
     return result;                      // Return the resulting matrix.
   }
   // Scalar division.
-  Matrices operator/(const T& scalar) const
+  Matrices operator/(const T& c) const
   {
     if (scalar==T{})                   // Check for division by zero.
     throw std::invalid_argument{"Matrices::operator/: Division by zero!"};
     Matrices result{rows,cols};        // Create a new matrix to hold the result.
     for (size_t i=0;i<rows;i++)        // For each row in the matrix.
-    for (size_t j=0;j<cols;j++)        // For each column in the matrix...
-        result.mat[i][j]=mat[i][j]/scalar; // Scale each element by the scalar value.
+      for (size_t j=0;j<cols;j++)      // For each column in the matrix...
+        result.mat[i][j]=mat[i][j]/c; // Scale each element by the scalar value.
     return result;                     // Return the resulting matrix.
   }
 
