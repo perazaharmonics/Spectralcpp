@@ -16,122 +16,131 @@
 
 template <typename T>
 class Vectors{
-  using Vec = std::vector<T>;          // A vector of type T
-  using Cx  = std::complex<T>;         // A complex number of type T
-  using CxVec = std::vector<Cx>;       // A vector of complex numbers of type T
-
 public:
   // Constructors and destructors:
   Vectors()=default;                    // Empty vector constructor.
-  explicit Vector(size_t n):            // Zero initialized length n 
+  explicit Vectors(size_t n):           // Zero initialized length n 
     vect(n,T{}){}                       // vector constructor.
   Vectors(std::initializer_list<T> init):// Initializer list constructor allows
     vect(init){}                        // to initialize the vector with a list of values.
-  Vectors(const Vec &v):                // Copy constructor to initialize the vector with another vector.
-    vect(v){}                           // This allows for easy initialization from another vector.
-  Vectors(Vec &&v):                     // Move constructor to initialize the vector with another vector.
-    vect(std::move(v)){}                // This allows for efficient initialization from another vector.
-   virtual ~Vectors()=default;
+  Vectors(const Vectors&)=default;      // Copy constructor to initialize the vector with another vector.
+  Vectors(Vectors&&)=default            // Move constructor to initialize the vector with another vector.
+  virtual ~Vectors()=default;
+  
+  
+  // Element accessors:
+  T &operator[](size_t i) noexcept { return vect[i]; }
+  const T &operator[](size_t i) const  noexcept { return vect[i]; }
+  T& at(size_t i)
+  {
+    if (i>=vect.size())
+      throw std::out_of_range{"Vectors::at(): Index out of range!"};
+    return vect[i];                   // Return the element at index i.
+  }
+  const T& at(size_t i) const
+  {
+    if (i>=vect.size())
+      throw std::out_of_range{"Vectors::at(): Index out of range!"};
+    return vect[i];                   // Return the element at index i.
+  }
+  // Front and back accessors:
+  T &front() noexcept { return vect.front(); } // Returns a reference to the first element.
+  const T &front() const noexcept { return vect.front(); } // Returns a const reference to the first element.
+  T &back() noexcept { return vect.back(); } // Returns a reference to the last element.
+  const T &back() const noexcept { return vect.back(); } // Returns a const reference to the last element.
+  // Push and pop methods:
+  void push_back(const T &value) { vect.push_back(value); } // Adds an element to the end of the vector.
+  void push_back(T &&value) { vect.push_back(std::move(value)); } // Adds an rvalue element to the end of the vector.
+  void pop_back() { vect.pop_back(); }  // Removes the last element from the vector.
+  void clear() noexcept { vect.clear(); }// Clears the vector, removing all elements.
+  void resize(size_t n, const T &value = T{}) // Resizes the vector to n elements, initializing new elements with value.
+  {                                     // ----------- resize ------------ //
+    vect.resize(n, value);              // Resize the vector to n elements.
+  }                                     // ----------- resize ------------ //
+  void reserve(size_t n) { vect.reserve(n); } // Reserves space for n elements, but does not change the size of the vector.
+  // Raw data accessor:
+  const std::vector<T>& data() const noexcept { return vect; } // Returns a const reference to the underlying vector data.
+  std::vector<T>& data() noexcept { return vect; } // Returns a reference to the underlying vector data.
+  // Capacity and size:
+  size_t size() const noexcept { return vect.size(); } // Returns the size of the vector.
+  bool empty() const noexcept { return vect.empty(); } // Returns true if the vector is empty.
 
-  // Operator overriding to allow for easy manipulation of vectors:
-  Vec &operator=(const Vec &v)          // Assignment operator to copy a vector.
-  {                                     // ----------- operator= ------------- //
-    vect=v;                             // Copy the vector.
-    return vect;                        // Return the vector.
-  }                                     // ----------- operator= ------------- //
-  Vec &operator=(Vec &&v)               // Move assignment operator to move a vector.
-  {                                     // ----------- operator= ------------- //
-    vect=std::move(v);                  // Move the vector.
-    return vect;                        // Return the vector.
-  }                                     // ----------- operator= ------------- //
-  T &operator[](size_t i)               // Subscript operator to access an element of the vector.
-  {                                     // ----------- operator[] ------------- //
-    if (i>=vect.size())                 // Is the index out of bounds?
-    {                                   // Yes, print error message.
-      std::cerr<<"[ERROR] Index out of bounds!\n";
-      return vect[0];                   // Return the first element if the index is out of bounds.
-    }                                   // Done checking if the index is out of bounds.
-    return vect[i];                     // Return the element at the index.
-  }                                     // ----------- operator[] ------------- //
-  const T &operator[](size_t i) const   // Const subscript operator to access an element of the vector.
-  {                                     // ----------- operator[] ------------- //
-    if (i>=vect.size())                 // Is the index out of bounds?
-    {                                   // Yes, print error message.
-      std::cerr<<"[ERROR] Index out of bounds!\n";
-      return vect[0];                   // Return the first element if the index is out of bounds.
-    }                                   // Done checking if the index is out of bounds.
-    return vect[i];                     // Return the element at the index.
-  }                                     // ----------- operator[] ------------- //
-  Vec &operator+=(const Vec &v)         // Addition assignment operator to add a vector.
+  // Iterators:
+  auto begin() noexcept { return vect.begin(); } // Returns an iterator to the beginning of the vector.
+  auto end() noexcept { return vect.end(); }     // Returns an iterator to the end of the vector.
+  auto begin() const noexcept { return vect.begin(); } // Returns a const iterator to the beginning of the vector.
+  auto end() const noexcept { return vect.end(); }     // Returns a const iterator to the end of the vector.
+
+  Vectors &operator=(const Vectors &v)  // Copy assignment operator to copy a vector.
+  {                                     // ----------- operator= ------------ //
+    if (this!=&v)                       // Are we not assigning to ourselves?
+      vect=v.vect;                      // Yes, copy the vector.
+    return *this;                       // Return the vector.
+  }                                     // ----------- operator= ------------ //
+  Vectors &operator=(Vectors &&v) noexcept // Move assignment operator to move a vector.
+  {                                     // ----------- operator= ------------ //
+    if (this!=&v)                       // Are we not assigning to ourselves?
+      vect=std::move(v.vect);           // Yes, move the vector.
+    return *this;                       // Return the vector.
+  }                                     // ----------- operator= ------------ //
+  Vectors &operator+=(const Vectors &v) // Addition assignment operator to add a vector.
   {                                     // ----------- operator+= ------------ //
     if (vect.size()!=v.size())          // Are the vectors the same length?
-    {                                   // No, can't add vectors.
-      std::cerr<<"[ERROR] Vectors must have the same length for addition!\n";
-      return vect;                      // Return the vector if they are not the same length.
-    }                                   // Done checking if the vectors are the same length.
+      throw std::invalid_argument{"Vectors:: -= size mismatch: Vectors must have the same length for addition!"};
     for (size_t i=0;i<vect.size();i++)  // For each element in the vector...
-    {                                   // Loop over the elements of the vector.
       vect[i]+=v[i];                    // Add the elements of the vectors.
-    }                                   // Done adding the vectors.
-    return vect;                        // Return the sum of the vectors.
+    return *this;                       // Return the sum of the vectors.
   }                                     // ----------- operator+= ------------ //
-  Vec &operator-=(const Vec &v)         // Subtraction assignment operator to subtract a vector.
+  Vectors &operator-=(const Vectors &v) // Subtraction assignment operator to subtract a vector.
   {                                     // ----------- operator-= ------------ //
     if (vect.size()!=v.size())          // Are the vectors the same length?
-    {                                   // No, can't subtract vectors.
-      std::cerr<<"[ERROR] Vectors must have the same length for subtraction!\n";
-      return vect;                      // Return the vector if they are not the same length.
-    }                                   // Done checking if the vectors are the same length.
+      throw std::invalid_argument{"Vectors:: -= size mismatch: Vectors must have the same length for subtraction!"};
     for (size_t i=0;i<vect.size();i++)  // For each element in the vector...
-    {                                   // Loop over the elements of the vector.
       vect[i]-=v[i];                    // Subtract the elements of the vectors.
-    }                                   // Done subtracting the vectors.
-    return vect;                        // Return the difference of the vectors.
+    return *this;                       // Return the difference of the vectors.
   }                                     // ----------- operator-= ------------ //
-  Vec &operator*=(const T &scalar)      // Multiplication assignment operator to scale a vector.
+  Vectors &operator*=(const T &scalar)  // Multiplication assignment operator to scale a vector.
   {                                     // ----------- operator*= ------------ //
+    if (vect.empty())                   // Is the vector emtpy?
+    {                                   // Yes, return the vector.
+      std::cerr<<"[ERROR] Vector is emtpy!\n";
+      return vect;                      // Return the vector if it is empty.
+    }                                   // Done checking if the vector is empty.
     for (size_t i=0;i<vect.size();i++)  // For each element in the vector...
     {                                   // Loop over the elements of the vector.
       vect[i]*=scalar;                  // Scale each element by the scalar value.
     }                                   // Done scaling the vector.
-    return vect;                        // Return the scaled vector.
+    return *this;                       // Return the scaled vector.
   }                                     // ----------- operator*= ------------ //
-  Vec &operator/=(const T &scalar)      // Division assignment operator to scale a vector.
+  Vectors &operator/=(const T &scalar)      // Division assignment operator to scale a vector.
   {                                     // ----------- operator/= ------------ //
-    if (scalar==T(0))                   // Is the scalar zero?
-    {                                   // Yes, can't divide by zero.
-      std::cerr<<"[ERROR] Cannot divide by zero!\n";
-      return vect;                      // Return the vector if the scalar is zero.
-    }                                   // Done checking if the scalar is zero.
+    if (scalar==T{})
+      throw std::invalid_argument{"Vectors:: /= division by zero: Cannot divide by zero!"};
     for (size_t i=0;i<vect.size();i++)  // For each element in the vector...
-    {                                   // Loop over the elements of the vector.
-      vect[i]/=scalar;                  // Scale each element by the scalar value.
-    }                                   // Done scaling the vector.
-    return vect;                        // Return the scaled vector.
+      vect[i]/=scalar;                  // Divide each element by the scalar value.
+    return *this;                       // Return the scaled vector.
   }                                     // ----------- operator/= ------------ //
-  // ---------------------------------- //
-  // Get the size of the vector.
-  // ---------------------------------- //
-  size_t Size() const                   // Returns the size of the vector.
-  {                                     // ----------- Size ------------------ //
-    return vect.size();                 // Return the size of the vector.
-  }                                     // ----------- Size ------------------ //
   // ---------------------------------- //
   // Getter for the vector.
   // ---------------------------------- //
-  const Vec &GetVector() const          // Returns the vector.
+  const std::vector<T> &GetVector() const 
   {                                     // ----------- GetVector ------------ //
-    return vect;                        // Return the vector.
+    return *this->vect;                 // Return the vector.
   }                                     // ----------- GetVector ------------ //
   // ---------------------------------- //
   // Setter for the vector.
   // ---------------------------------- //
-  void SetVector(const Vec &v)          // Sets the vector.
+  void SetVector(const std::vector<T> &v)    
   {                                     // ----------- SetVector ------------ //
-    vect=v;                             // Set the vector to the input vector.
+    *this->vect=v;                      // Set the vector to the input vector.
   }                                     // ----------- SetVector ------------ //
 
-  // Vector operations:
+  // Non-member friends:
+  friend Vectors operator+(Vectors v1, const Vectors& v2) { return v1+=v2; }
+  friend Vectors operator-(Vectors v1, const Vectors& v2) { return v1-=v2; }
+  friend Vectors operator*(Vectors v, const T& s) { return v*=s; } // Scale vector by scalar.
+  friend Vectors operator*(const T&s, Vectors v) { return v*=s; } // Scale vector by scalar.
+  friend Vectors operator/(Vectors v, const T& s) { return v/=s; } // Scale vector by scalar.
   // ---------------------------------- //
   // Compute the dot product of two vectors. The vector dot product tell us
   // The similarity between two vectors. The angle between the two vectors
@@ -140,29 +149,13 @@ public:
   // where v1 and v2 are the vectors, ||v1|| and ||v2|| are the norms of the vectors,
   // and theta is the angle between the vectors.
   // ---------------------------------- //
-  T VectorDotProduct(const Vec &v1, const Vec &v2) const{
+  T VectorDotProduct(const Vectors& v2) const{
     if (v1.size()!=v2.size())           // Are they the same length?
-    {                                   // No, can't compute dot product.
-      std::cerr<<"[ERROR] Vectors must have the same length for dot product!\n";
-      return T(0);                      // Return 0 if they are not the same length.
-    }                                   // Done checking if they are the same length.
-    T sum{0.0};                         // Initialize the sum.
-    size_t N=v1.size();                 // Get the size of the vectors.
-    for (size_t i=0;i<N;i++)            // For the length of the vectors...
-    {                                   // Loop over the elements of the vectors.
-      if (std::isnan(v1[i])||std::isnan(v2[i]))// Any NaN in the vectors?
-      {                                 // Yes, print warning.
-        std::cerr<<"[WARNING] NaN detected in vectors!\n";// Return error message.
-        return T(0);                    // Return 0 if there is a NaN.
-      }                                 // Done checking for NaN.
-      if (std::isinf(v1[i])||std::isinf(v2[i]))// Any Inf in the vectors?
-      {                                 // Yes, print warning.
-        std::cerr<<"[WARNING] Inf detected in vectors!\n";
-        return T(0);                    // Return 0 if there is an Inf.
-      }                                 // Done checking for Inf.
-        sum+=v1[i]*v2[i];               // Accumulate the product.
-    }                                   // Done computing the dot product.
-    return sum;                         // Return the dot product.    
+      throw std::invalid_argument{"Vectors:: dot product size mismatch: Vectors must have the same length for dot product!"};
+    T sum = T{};                        // Initialize the sum to zero.
+    for (size_t i=0;i<size();i++)       // For each element in the vector...
+      sum+=std::conj(vect[i])*v2.vect[i];// Compute the dot product.
+    return sum;                         // Return the dot product.
   }                                     // --------- VectorDotProduct ------- //
   
   // ---------------------------------- //
@@ -174,30 +167,9 @@ public:
   // of the magnitute of a vector in physics. Thus it is also the power calculation.
   // ---------------------------------- //
 
-  T VectorNorm(const Vec &v) const      // Returns norm of a vector.
+  T VectorNorm() const                  // Returns norm of a vector.
   {                                     // ----------- VectorNorm ------------ //
-    if (v.empty())                      // Is the vector emtpy?
-    {                                   // Yes, return 0.
-      std::cerr<<"[ERROR] Vector is emtpy!\n";
-      return T(0);                      // Return 0 if the vector is empty.
-    }                                   // Done checking if the vector is empty.
-    T sum{0.0};                         // Initialize the sum.
-    size_t N=v.size();                  // Get the size of the vector.
-    for (size_t i=0;i<N;i++)            // For the length of the vector...
-    {                                   // Loop over the elements of the vector.
-      if (std::isnan(v[i]))             // Any NaN in the vector?
-      {                                 // Yes print warning.
-        std::cerr<<"[WARNING] NaN detected in vector!\n";
-        return T(0);                    // Return 0 if there is a NaN.
-      }                                 // Done checking for NaN.
-      if (std::isinf(v[i]))             // Any Inf in the vector?
-      {                                 // Yes, print warning.
-        std::cerr<<"[WARNING] Inf detected in vector!\n";
-        return T(0);                    // Return 0 if there is an Inf.
-      }                                 // Done checking for Inf.
-      sum+=v[i]*v[i];                   // Accumulate the square of the element.
-    }                                   // Done computing the squared sum of the vector.
-    return std::sqrt(sum);              // Return the square root of the sum.
+    return std::sqrt(VectorDotProduct(*this));
   }                                     // ----------- VectorNorm ------------ //   
   
   // ---------------------------------- //
@@ -205,25 +177,14 @@ public:
   // norm. This is useful for normalizing vectors in spectral analysis.
   // The function returns a new vector that is the normalized version of the input vector.
   // ---------------------------------- //
-  Vec NormalizeVector(const Vec &v)  const// Retuns a normalized vector.  
+  Vectors NormalizeVector()  const      // Retuns a normalized vector.  
   {                                     // ----------- NormalizeVector --------- //
-    if (v.empty())                      // Is the vector emtpy?
-    {                                   // Yes, return an empty vector.
-      std::cerr<<"[ERROR] Vector is emtpy!\n";
-      return Vec{};                     // Return an empty vector if the vector is empty.
-    }                                   // Done checking if the vector is empty.
-    T norm=VectorNorm(v);               // Get the norm of the vector.
-    if (norm==T(0))                     // Is the norm zero?
-    {                                   // Yes, return an empty vector.
-      std::cerr<<"[ERROR] Vector norm is zero!\n";
-      return Vec{};                     // Return an empty vector if the norm is zero.
-    }                                   // Done checking if the norm is zero.
-    Vec normal(v.size());               // Create a new vector of the same size as v.
-    for (size_t i=0;i<v.size();i++)     // For each element in the vector...
-    {                                   // Loop over the elements of the vector.
-      normal[i]=v[i]/norm;              // Divide each element by the norm.
-    }                                   // Done normalizing the vector.
-    return normal;                      // Return the normalized vector.
+    auto n=VectorNorm();                // Compute the norm of the vector.
+    if (n==T{})                         // Is the norm zero?
+      throw std::runtime_error{"Vectors:: NormalizeVector(): Cannot normalize a zero vector!"};
+    Vectors v2 = *this;                 // Create a copy of the vector to normalize.
+    v2/=n;                              // Scale the vector by the norm to normalize it.
+    return v2;                          // Return the normalized vector.
   }                                     // ----------- NormalizeVector --------- //
   // ---------------------------------- //
   // Compute the angle between two vectors using the dot product and norms.
@@ -233,22 +194,38 @@ public:
   // and theta is the angle between the vectors.
   // The angle is returned in radians.
   // ---------------------------------- //
-  T VectorAngle(const Vec &v1, const Vec &v2) const
+  T VectorAngle(const Vectors &v2) const//S
   {                                     // ----------- VectorAngle ------------ //
-    if (v1.size()!=v2.size())           // Are they the same length?
-    {                                   // No, can't compute angle.
-      std::cerr<<"[ERROR] Vectors must have the same length for angle computation!\n";
-      return T(0);                      // Return 0 if they are not the same length.
-    }                                   // Done checking if they are the same length.
-    T dot=VectorDotProduct(v1,v2);      // Compute the dot product of the vectors.
-    T norm1=VectorNorm(v1);             // Compute the norm of the first vector.
-    T norm2=VectorNorm(v2);             // Compute the norm of the second vector.
-    if (norm1==T(0)||norm2==T(0))       // Are any of the norms zero?
-    {                                   // Yes, can't compute angle.
-      std::cerr<<"[ERROR] Cannot compute angle with zero norm vector!\n";
-      return T(0);                      // Return 0 if any of the norms is zero.
-    }                                   // Done checking if any of the norms is zero.
-    return std::acos(dot/(norm1*norm2)); // Return the angle in radians.
+    if (size()!=v2.size())              // Are the vectors the same length?
+      throw std::invalid_argument{"Vectors:: angle size mismatch: Vectors must have the same length for angle computation!"};
+    T n1=VectorNorm(),n2=v2.VectorNorm();// Compute the norms of the vectors.
+    if (n1==T{} || n2==T{})             // Are the norms zero?
+      throw std::runtime_error{"Vectors:: VectorAngle(): Cannot compute angle with zero vector!"};
+   auto inner=VectorDotProduct(v2)/(n1*n2);// Compute the dot product and normalize it.
+   if constexpr (std::is_floating_point_v<T>)// Is T floating point?
+   {                                    // Yes so clamp the value to [-1, 1] 
+     inner=std::max<T>(T{-1}, std::min<T>(T{1}, inner)); //  to avoid NaN.
+     return std::acos(inner);           // Return the angle in radians.
+   }                                    // Done checking if floating point.
+   constexpr bool iscomplex{            // Check if T is complex.
+     std::is_same_v<T, std::complex<float>> ||
+     std::is_same_v<T, std::complex<double>> ||
+     std::is_same_v<T, std::complex<long double>>
+   };                                   //
+   else if (iscomplex)                  // Is it complex?
+   {                                    // Yes
+    return std::arg(inner);             // Return the phase of the complex number.
+   }                                    //
+   else                                 // Else we don't know how to hadnle it.
+   {                                    // So throw an error if it is not
+    static_assert(                      //  any of these types:
+      std::is_floating_point_v<T> ||
+      std::is_same_v<T,std::complex<float>>   ||
+      std::is_same_v<T,std::complex<double>>  ||
+      std::is_same_v<T,std::complex<long double>>,
+      "Vectors::VectorAngle<T> requires T be float, double, or std::complex thereof"
+    );                                  //
+   }                                    // Done throwing error if not valid type.   
   }                                     // ----------- VectorAngle ------------ //
   // ---------------------------------- //
   // Compute the cross product of two vectors. The cross product is only defined
@@ -260,77 +237,18 @@ public:
   // where v1 and v2 are the vectors.
   // The function returns a new vector that is the cross product of the input vectors.
   // ---------------------------------- //
-  Vec VectorCrossProduct(const Vec &v1, const Vec &v2) const
+  Vectors VectorCrossProduct(const Vectors& v2) const
   {                                     // ----------- VectorCrossProduct ------ //
-    if (v1.size()!=3||v2.size()!=3)     // Are they both 3-dimensional?
-    {                                   // No, can't compute cross product.
-      std::cerr<<"[ERROR] Vectors must be 3-dimensional for cross product!\n";
-      return Vec{};                     // Return an empty vector if they are not 3-dimensional.
-    }                                   // Done checking if they are both 3-dimensional.
-    Vec cross(3);                       // Create a new vector of size 3.
-    cross[0]=v1[1]*v2[2]-v1[2]*v2[1];   // Compute the first element of the cross product.
-    cross[1]=v1[2]*v2[0]-v1[0]*v2[2];   // Compute the second element of the cross product.
-    cross[2]=v1[0]*v2[1]-v1[1]*v2[0];   // Compute the third element of the cross product.
-    return cross;                       // Return the cross product vector.
+    if (size()!=3||v2.size()!=3)        // Are the vectors 3D?
+      throw std::invalid_argument{"Vectors:: cross product size mismatch: Vectors must be 3D for cross product!"};
+    return Vectors{                     // Create a new vector for the cross product.
+      vect[1]*v2.vect[2] - vect[2]*v2.vect[1], // i component
+      vect[2]*v2.vect[0] - vect[0]*v2.vect[2], // j component
+      vect[0]*v2.vect[1] - vect[1]*v2.vect[0]  // k component
+    };                                  // Return the cross product vector.
   }                                     // ----------- VectorCrossProduct ------ //
-  // ---------------------------------- //
-  // Add two vectors element-wise.
-  // The function returns a new vector that is the sum of the two input vectors.
-  // The input vectors must be of the same size.
-  // ----------------------------------- //
-  Vec AddVectors(const Vec &v1, const Vec &v2) const
-  {                                     // ----------- AddVectors ------------ //
-    if (v1.size()!=v2.size())           // Are they the same length?
-    {                                   // No, can't add vectors.
-      std::cerr<<"[ERROR] Vectors must have the same length for addition!\n";
-      return Vec{};                     // Return an empty vector if they are not the same length.
-    }                                   // Done checking if they are the same length.
-    Vec sum(v1.size());                 // Create a new vector of the same size as v1 and v2.
-    for (size_t i=0;i<v1.size();i++)    // For each element in the vectors...
-    {                                   // Loop over the elements of the vectors.
-      sum[i]=v1[i]+v2[i];               // Add the elements of the vectors.
-    }                                   // Done adding the vectors.
-    return sum;                         // Return the sum of the vectors.
-  }                                     // ----------- AddVectors ------------ //
-  // ---------------------------------- //
-  // Subtract two vectors element-wise.
-  // The function returns a new vector that is the difference of the two input vectors.
-  // The input vectors must be of the same size.
-  // ----------------------------------- //
-  Vec SubtractVectors(const Vec &v1, const Vec &v2) const
-  {                                     // ----------- SubtractVectors ------- //
-    if (v1.size()!=v2.size())           // Are they the same length?
-    {                                   // No, can't subtract vectors.
-      std::cerr<<"[ERROR] Vectors must have the same length for subtraction!\n";
-      return Vec{};                     // Return an empty vector if they are not the same length.
-    }                                   // Done checking if they are the same length.
-    Vec diff(v1.size());                // Create a new vector of the same size as v1 and v2.
-    for (size_t i=0;i<v1.size();i++)    // For each element in the vectors...
-    {                                   // Loop over the elements of the vectors.
-      diff[i]=v1[i]-v2[i];              // Subtract the elements of the vectors.
-    }                                   // Done subtracting the vectors.
-    return diff;                        // Return the difference of the vectors.
-  }                                     // ----------- SubtractVectors ------- //
-  // ---------------------------------- //
-  // Scale a vector by a scalar value.
-  // ---------------------------------- //S
-  Vec ScaleVector(const Vec &v, T scalar) const
-  {                                     // ----------- ScaleVector ------------ //
-    if (v.empty())                      // Is the vector emtpy?
-    {                                   // Yes, return an empty vector.
-      std::cerr<<"[ERROR] Vector is emtpy!\n";
-      return Vec{};                     // Return an empty vector if the vector is empty.
-    }                                   // Done checking if the vector is empty.
-    Vec scaled(v.size());               // Create a new vector of the same size as v.
-    for (size_t i=0;i<v.size();i++)     // For each element in the vector...
-    {                                   // Loop over the elements of the vector.
-      scaled[i]=v[i]*scalar;            // Scale each element by the scalar value.
-    }                                   // Done scaling the vector.
-    return scaled;                      // Return the scaled vector.
-  }                                     // ----------- ScaleVector ------------ //
 
 private:
-  Vec vect;                             // The vector of type T.
-  
+  std::vector<T> vect;                             // The vector of type T.
 };
 #endif // VECTORS_H
