@@ -122,7 +122,7 @@ public:
   }                                     // ----------- FrobeniusNorm ------------ //
   // Get the average power of all signals (the row or col vectors
   // in the signal with the elements representing the samples
-  // of the signal.
+  // of the signals.
   T FrobeniusAveragePower() const
   {
     if (mat.empty() || mat[0].empty())   // Do we have a matrix of signals to operate on?
