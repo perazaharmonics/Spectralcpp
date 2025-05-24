@@ -7,6 +7,9 @@
 #ifndef VECTORS_H
 #define VECTORS_H
 #include <vector>
+#include <initializer_list>
+#include <stdexcept>
+#include <type_traits>
 #include <complex>
 #include <cmath>
 #include <numeric>
