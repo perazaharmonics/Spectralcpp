@@ -121,7 +121,7 @@ public:
     return std::sqrt(sum);              // Return the square root of the sum as the Frobenius norm.
   }                                     // ----------- FrobeniusNorm ------------ //
   // Get the average power of all signals. The row or col vectors
-  // in the representing each a signal with the elements representing the samples
+  // in the matrix representing each a signal with the elements representing the samples
   // of the signals.
   T FrobeniusAveragePower() const
   {
