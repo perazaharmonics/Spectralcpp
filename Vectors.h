@@ -252,6 +252,6 @@ public:
   }                                     // ----------- VectorCrossProduct ------ //
 
 private:
-  std::vector<T> vect;                             // The vector of type T.
+  std::vector<T> vect{T{0}};                             // The vector of type T.
 };
 #endif // VECTORS_H
