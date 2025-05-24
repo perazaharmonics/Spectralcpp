@@ -120,7 +120,19 @@ public:
         sum+=elem*elem;                 // Add the square of the element to the sum.
     return std::sqrt(sum);              // Return the square root of the sum as the Frobenius norm.
   }                                     // ----------- FrobeniusNorm ------------ //
-  
+  // Get the average power of all signals (the row or col vectors
+  // in the signal.
+  T FrobeniusAveragePower() const
+  {
+    if (mat.empty() || mat[0].empty())   // Do we have a matrix of signals to operate on?
+      return T{};                        // No, can't do much without data. Exit.
+    T sum{};                             // Initialize sum to zero.
+    size_t N=rows;                       // Get the number of rows in the matrix.
+    for (size_t i=0;i<N;i++)             // Loop through each row in the matrix.
+      for (const auto& elem:mat[i])      // For every element in the matrix.
+        sum+=elem*elem;                  // Add the square of the element to the result.
+    return sum/static_cast<T>(rows*cols);// Divide energy by all elements of the matrix.
+  }                                      // ------- FrobeniusAveragePower ----------- //
   // Copy and move assignment operators:
   Matrices& operator=(const Matrices& rhs) = default; // Copy assignment operator.
   Matrices& operator=(Matrices&& rhs) noexcept = default; // Move assignment operator.
