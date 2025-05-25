@@ -263,12 +263,16 @@ public:
     Matrices<T> AH=this->conjugateTranspose(); // Get the conjugate transpose of the matrix.
     Matrices<T> I=(*this)*AH;           // Compute A * A^H.
     for (size_t i=0;i<rows;i++)         // For each row in the matrix...
-      for (size_t j=0;j<cols;j++)       // For each column in the matrix...
+    {                                   //    and..
+      for (size_t j=0;j<cols;j++)       // ...for each column in the matrix...
+      {                                 // Test for unitary matrix.
         if (i==j)                       // If we are on the diagonal...
           if (std::abs(I(i,j)-T{1})>tol) // Is it equal to 1 within tolerance?
             return false;               // No, so its not unitary.
         else if (std::abs(I(i,j))>tol)  // Else, is it zero within tolerance?
           return false;                 // No, so its not unitary.
+      }                                 // Done checking all elements.
+    }                                   // Done testing for unitary.
     return true;                        // Else, the matrix is unitary.
   }                                     // ----------- IsUnitary ------------ //
   // IsOrthogonal: Check if the matrix is orthogonal (A*A^T == I). Help verify
