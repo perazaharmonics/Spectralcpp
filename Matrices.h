@@ -187,6 +187,21 @@ public:
         result.mat[i][j]=mat[i][j]*c;   // Scale each element by the scalar value.
     return result;                      // Return the resulting matrix.
   }
+  // Matrix * vector multiplication.
+  Matrices operator*(const std::vector<T>& vec) const
+  {
+    if (cols!=vec.size())               // Check if the vector size matches the number of columns.
+      throw std::invalid_argument{"Matrices::operator*: Size mismatch: Vector size must match the number of columns!"};
+    Matrices result(rows, 1);           // Create a new matrix to hold the result (column vector).
+    for (size_t i=0;i<rows;i++)         // For each row in the matrix...
+    {                                   // Compute the dot product with the vector.
+      T sum{};                          // Initialize the sum for the dot product.
+      for (size_t j=0;j<cols;j++)       // Loop through the columns.
+        sum+=mat[i][j]*vec[j];          // Compute the dot product.
+      result.mat[i][0]=sum;             // Store the result in the new matrix.
+    }                                   // Done computing the product.
+    return result;                      // Return the resulting matrix.
+  }
   // Scalar division.
   Matrices operator/(const T& scalar) const
   {
