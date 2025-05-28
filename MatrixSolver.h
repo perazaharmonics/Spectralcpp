@@ -41,6 +41,12 @@ public:
     return QREigen(A,maxIter,tol);      // No, use the QR iteration algorithm for eigenvalue computation.
   }                                     // ----------- SolveEigen ------------ //
 
+  /**
+  * TODO: Need to add a check to verify that all eigenvalues of a Covariance
+  * Matrix are real, and non-negative. In fact, should probably add various
+  * Eigenvalue properties validation functions.
+  */
+
     // LU Decomposition with partial pivoting. Returns (L,U,pivots) such that:
     // P*A=L*U, where P is a permutation matrix.
     std::tuple<Matrices<T>,Matrices<T>,std::vector<size_t>>
