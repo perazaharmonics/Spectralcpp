@@ -337,6 +337,10 @@ public:
       os<<std::endl;                    // Print a newline after each row.
     }                                   // Done printing the matrix.
   }                                     // ----------- Print ------------ //
+/*
+* TODO: Need to add checks for Circulant Matrix, Topelitz Matrix, 
+* Positive Definite Matrix, Complex Matrix, and Positive Semi Definite.
+*/
 private:
   // Helper function for complext transpose:
   Matrices<T> conjugateTranspose(void) const
