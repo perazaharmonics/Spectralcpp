@@ -327,6 +327,47 @@ public:
     }                                   // Done testing for anti-symmetry.
     return true;                        // Else, the matrix is anti-symmetric.          
   }                                     // ----------- IsAntiSymmetric ------------ //
+
+/*
+* TODO: Need to add checks for Topelitz Matrix, 
+* Positive Definite Matrix, Complex Matrix, and Positive Semi Definite.
+*/
+
+  // Is Circular: Check if the matrix is circulant matrix. A circular matrix
+  // is a special type of Toeplitz matrix where each row is a cyclic shift of the previous row.
+  // It is useful in signal processing applications, such as cyclic convolution 
+  // and filtering. In other words, when multiplied by the Fourier matrix, the
+  // circulant matrix gets diagonalized. Where the diagonals are related to the
+  // eigenvalues of the circulant matrix. Such that for any Circulant Matrix C
+  // there exists a Fourier Matrix F, such that F^-1*C*F is a diagonal matrix,
+  // where the resulting diagonal elements are the eigenvalues of C.
+  // As a sidebar, the columns of the Fourier matrix are the eigenvalues of the
+  // circulant matrix.
+  bool IsCircular(double tol=1e-9) const
+  {                                     // ----------- IsCircular ----------- //
+    if (rows!=cols)                     // Is the matrix square?
+      return false;                     // No, so it's not circulant either.
+    // We store the first row of the matrix to compare with the rest.
+    std::vector<T> firstrow=mat[0];     // Store the first row of the matrix.
+    for (size_t i=1;i<rows;i++)         // For each row; not the first...
+    {                                   // Test if it's circulant.
+      bool foundmatch=false;            // Flag to check if we found a match.
+      for (size_t shift=0;shift<cols;shift++)// For each possible shift...
+      {                                 // Test if the row matches the first row shifted..
+        std::vector<T> shiftedrow(cols);// Create a vector to hold the shifted row.
+        for (size_t j=0;j<cols;j++)     // For each column in THIS row...
+          shiftedrow[j]=mat[i][(j+shift)%cols]; // Shift the row by shift positions.
+        if (shiftedrow==firstrow)       // Shifted row matches first row?
+        {                               // Yes, so the matrix is circulant.
+          foundmatch=true;              // Set the flag to true.
+          break;                        // Break out of the loop...
+        }                               // Done checking for a match.
+      }                                 // Done checking all shifts.
+      if (!foundmatch)                  // Did we find a match?
+        return false;                   // No, so the matrix is not circulant.
+    }                                   // Done checking for all rows.
+    return true;                        // If we got here, it is circulant.
+  }                                     // ----------- IsCircular ----------- //
   // Debug print.
   void Print(std::ostream& os = std::cout) const
   {                                     // ----------- Print ------------ //
@@ -337,10 +378,7 @@ public:
       os<<std::endl;                    // Print a newline after each row.
     }                                   // Done printing the matrix.
   }                                     // ----------- Print ------------ //
-/*
-* TODO: Need to add checks for Circulant Matrix, Topelitz Matrix, 
-* Positive Definite Matrix, Complex Matrix, and Positive Semi Definite.
-*/
+
 private:
   // Helper function for complext transpose:
   Matrices<T> conjugateTranspose(void) const
