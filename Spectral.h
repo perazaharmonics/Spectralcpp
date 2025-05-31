@@ -391,11 +391,6 @@ std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStri
   const int NBits=UpperLog2(static_cast<int>(s.size())); // Get the number of bits for the FFT.
   const int N=1<<NBits;                 // Get the FFT length as a power of 2.
   // ---------------------------------- //
-  // Precompute the twiddle factors for the FFT.
-  // The twiddle factors are used to rotate the signal in the FFT.
-  // ---------------------------------- //
-  const vector<complex<T>> twiddles=TwiddleFactorFullN(N); // Phase-frequency vector.
-  // ---------------------------------- //
   // Create temporary buffers for the FFT.
   // The last buffer holds the previous stage of the FFT.
   // The current buffer holds the current stage of the FFT.
