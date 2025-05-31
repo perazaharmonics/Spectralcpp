@@ -328,10 +328,21 @@ public:
     return true;                        // Else, the matrix is anti-symmetric.          
   }                                     // ----------- IsAntiSymmetric ------------ //
 
-/*
-* TODO: Need to add checks for Topelitz Matrix, 
-* Positive Definite Matrix, Complex Matrix, and Positive Semi Definite.
-*/
+ // IsHermitian: Check if the matrix is Hermitian (A == A^H for complex matrices).
+  bool IsHermitian(double tol=1e-9) const
+  {                                     // ----------- IsHermitian ------------ //
+    if (rows!=cols)                     // Is the matrix square?
+      return false;                     // No, so it's not Hermitian either.
+    for (size_t i=0;i<rows;i++)         // For each row in the matrix...
+      for (size_t j=0;j<cols;j++)       // For each column in the matrix...
+      {                                 // Test for Hermitian property.
+        auto a=mat[i][j];               // Matrix element at (i,j).
+        auto b=std::conj(mat[j][i]);    // Conjugate for complex types.
+        if (std::abs(a-b)>tol)          // Are the elements equal within tolerance?
+          return false;                 // No, the matrix is not Hermitian.
+      }                                 // Done checking all elements.
+    return true;                        // Else, the matrix is Hermitian.
+  }                                     // ----------- IsHermitian ------------ //
 
   // Is Circular: Check if the matrix is circulant matrix. A circular matrix
   // is a special type of Toeplitz matrix where each row is a cyclic shift of the previous row.
@@ -348,26 +359,193 @@ public:
     if (rows!=cols)                     // Is the matrix square?
       return false;                     // No, so it's not circulant either.
     // We store the first row of the matrix to compare with the rest.
-    std::vector<T> firstrow=mat[0];     // Store the first row of the matrix.
-    for (size_t i=1;i<rows;i++)         // For each row; not the first...
-    {                                   // Test if it's circulant.
+    const Sstd::vector<T> &firstrow=mat[0];// Store the first row of the matrix.
+    for (size t i=1;i<rows;i++)         // For each subsequent row...
+    {                                   // Start testing for circulance property.
       bool foundmatch=false;            // Flag to check if we found a match.
       for (size_t shift=0;shift<cols;shift++)// For each possible shift...
-      {                                 // Test if the row matches the first row shifted..
-        std::vector<T> shiftedrow(cols);// Create a vector to hold the shifted row.
-        for (size_t j=0;j<cols;j++)     // For each column in THIS row...
-          shiftedrow[j]=mat[i][(j+shift)%cols]; // Shift the row by shift positions.
-        if (shiftedrow==firstrow)       // Shifted row matches first row?
-        {                               // Yes, so the matrix is circulant.
-          foundmatch=true;              // Set the flag to true.
-          break;                        // Break out of the loop...
-        }                               // Done checking for a match.
+      {                                 // 
+        std::vector<T> shiftedrow(cols);// Build shifted version of mat[i].
+        for (size_t j=0;j<cols;j++)     // For each column in the row...
+          shiftedrow[j]=mat[i][(j+shift)%cols];// Shift elements cyclically.
+        if constexpr (std::is_floating_pint_v<T>)// Is it a floating point vector?
+        {                               // Yes so we should factor in tolerance.
+          bool allclose=true;           // Flag to check if all elements are close.
+          for (size_t j=0;j<cols;j++)   // For each column in the row....
+          {                             // Check if we are within tolerance...
+            if (std::abs(shiftedrow[j]-firstrow[j])>tol)// Are the elements close?
+            {                           // No..
+              allclose=false;           //  ..set the flag to false.
+              break;                    // Break out of the test loop.
+            }                           // Done checking all elements.
+          }                             // Done checking all elements in the row.
+          if (allclose)                 // if all element are close...
+          {                             // We found a match.
+            foundmatch=true;            // Set the flag to true.
+            break;                      // Break out of the shift loop.
+          }                             // Done checking if all shift elems are close.  
+        }                               // Done checking if floaing point.
+        else                            // Else, not flaoting point.
+        {                               // So we can check for exact equality.
+          if (shiftedrow==firstrow)     // Are the shifted and first row equal?
+          {                             // Yes, found a match.
+            foundmatch=true;            // Set the flag to true.
+            break;                      // Break out of the shift loop.
+          }                             // Done checking if shifted row is equal to first row.
+        }                               // Done checking if not floating point.
       }                                 // Done checking all shifts.
-      if (!foundmatch)                  // Did we find a match?
-        return false;                   // No, so the matrix is not circulant.
-    }                                   // Done checking for all rows.
-    return true;                        // If we got here, it is circulant.
-  }                                     // ----------- IsCircular ----------- //
+      if (!foundmatch)                  // If we did not find a match...
+        return false;                   // Then the matrix is not circulant.
+    }                                   // Done checking all rows.
+    return true;                        // If we got here the matrix is circulant.
+  }                                     // ----------- IsCircular ----------- // 
+  // IsToeplitz: Check if a matrix is a Toeplitz matrix. A toeplitz matrix is constant
+  // along its diagonals. So we check if A[i][j]=A[i-1][j-1] for all i,j.
+  // Topelitz matrix in DSP represent Linear Time Invariant (LTI) systems,
+  // where the system response is constant over time. This property is useful
+  // in signal processing applications, such as filtering and convolution.
+  bool IsToeplitz(double tol=1e-9) const
+  {                                     // ----------- IsToeplitz ------------ //
+    if (rows==0||cols==0)               // Empty matrix?
+      return false;                     // Can't do much.
+    for (size_t i=1;i<rows;i++)         // For the first row...
+    {                                   //  We start checking the diagonals.
+      for (size_t j=1;j<cols;j++)       // For the first column...
+      {                                 // 
+        if constexpr (std::is_floating_point_v<T>)// Is it a floating point matrix?
+        {                               // Yes, so we should factor in tolerance.
+          if (std::abs(mat[i][j]-mat[i-1][j-1])>tol) // Are the elements equal within tolerance?
+            return false;               // No, so it's not Toeplitz.
+        }                               // Done checking if floating point.
+        else                            // Else, not floating point.
+        {                               // So we can check for exact equality.
+          if (mat[i][j]!=mat[i-1][j-1]) // Are the elements equal?
+            return false;               // No, so it's not Toeplitz.
+        }                               // Done checking if not floating point.
+      }                                 // Done checking all columns in the row.
+    }                                   // Done checking all rows.
+    return true;                        // If we got here, the matrix is Toeplitz.
+  }                                     // ----------- IsToeplitz ------------ //
+  // IsPositiveDefinite: Check if the matrix is positive definite.
+  // A positive definite matrix is a symmetric matrix with all positive eigenvalues.
+  // It attempts an in-place Cholesky. If any pivot is less or equal to tol, then
+  // it is not positive definite. It is true if A is strictly (Hermitian) positive definite.
+  // 
+  bool IsPositiveDefinite(double tol=1e-9) const
+  {                                     // ----------- IsPositiveDefinite ------------ //
+    if (rows!=cols)                     // Is the matrix square?
+      return false;                     // No, so it's not positive definite either.
+    Matrices<T> C=*this;                // Create a copy so we do not overwite original.
+    for (size_t k=0;k<rows;k++)         // For each row in the matrix...
+    {                                   // Begin computations...
+    // Compute the sum{m=0...k-1} |C(k,m)|^2
+      long double sum=0.0L;             // Initialize the sum to zero.
+      for (size_t m=0;m<rows;m++)       // For each row in the matrix.
+      {                                 // Start testing matrix.
+        if constexpr (std::is_floating_pint_v<T>)// Are elems floating point?
+        {                               // Yes so get the norm.
+          sum+=std::norm(C(k,m));       // Compute the norm of the element.
+        }                               // Done checking if floating point.
+        else                            // Else, not floating point.
+        {                               // Se we can treat norm as squared.
+          sum+=static_cast<long double>(C(k,m))*
+            static_cast<long double>(C(k,m)); // Compute the squared element.
+        }                               // Done checking if not floating point.
+      }                                 // Done computing the sum.
+      long double diag=static_cast<long double>(C(k,k))-sum; // Compute the diagonal element.
+      if (diag<=tol)                    // Is pivot less than or equal to tol?
+        return false;                   // Yes, so the matrix is not positive definite.
+      C(k,k)=static_cast<T>(std::sqrt(diag));// Set the diagonal to sqrt(diag).
+      // ------------------------------ //
+      // Now compute Cholesky factorization where:
+      // L(i,k)=[C(i,k)-sum{m<k} L(i,m)*L(k,m)]/L(k,k)
+      // ------------------------------ //
+      for (size_t i=k+1;i<rows;i++)     // For each row below the pivot...
+      {                                 // Start computing the Cholesky factorization.
+        long double sum2{0.0L};         // Initialize the sum to zero.
+        for (size_t m=0;m<k;m++)        // For each col in the row...
+        {                               // Start computing the sum of products.
+          if constexpr (std::is_floating_point_v<T>)// Are elems floating point?
+          {                             // Yes,
+            sum2+=C(i,m)*std::conj(C(k,m)); // Compute the sum of products.
+          }                             // Done checking if floating point.
+          else                          // Else, not floating point.
+          {                             // So we can treat norm as squared.
+            sum2+=static_cast<long double>(C(i,m))*
+              static_cast<long double>(C(k,m)); // Compute the squared element.
+          }                             // Done checking if not floating point.
+        }                               // Done computing the sum of products.
+        long double num=static_cast<long double>(C(i,k))-sum2; // Compute the numerator.
+        long double denom=static_cast<long double>(C(k,k));// Get the denominator.
+        if (std::abs(denom)<tol)        // Is the denominator less than tol (zero pivot)?
+          return false;                 // Yes, we can't divide by zero.. so just exit.
+        C(i,k)=static_cast<T>(num/denom); // Compute the Cholesky factorization.
+      }                                 // Done computing the Cholesky factorization.
+    }                                   // Done with all computations.
+    return true;                        // If we got here, the matrix is positive definite.
+  }                                     // ----------- IsPositiveDefinite ------------ //
+  // IsPositiveSemiDefinite: Check if the matrix is positive semi-definite.
+  // Similar to IsPositiveDefinite in the way it operates, but it allows zero pivots
+  // within tol. True iff all eigenvalues >=0 (Hermitian semidifinite).
+  bool IsSemiPositiveDefinite(double tol=1e-9) const
+  {                                     // ----------- IsSemiPositiveDefinite 
+    if (rows!=cols)                     // Is the matrix square?
+      return false;                     // No, so it's not semi-positive definite either.
+    Matrices<T> C=*this;                // Create a copy so we do not overwite original.
+    for (size_t k=0;k<rows;k++)         // For each row in the matrix...
+    {                                   // Begin computations...
+      // Compute the sum{m=0...k-1} |C(k,m)|^2
+      long double sum=0.0L;             // Initialize the sum to zero.
+      for (size_t m=0;m<rows;m++)       // For each row in the matrix.
+      {                                 // Start testing matrix.
+        if constexpr (std::is_floating_pint_v<T>)// Are elems floating point?
+        {                               // Yes so get the norm.
+          sum+=std::norm(C(k,m));       // Compute the norm of the element.
+        }                               // Done checking if floating point.
+        else                            // Else, not floating point.
+        {                               // Se we can treat norm as squared.
+          sum+=static_cast<long double>(C(k,m))*
+            static_cast<long double>(C(k,m)); // Compute the squared element.
+        }                               // Done checking if not floating point.
+      }                                 // Done computing the sum.
+      long double diag=static_cast<long double>(C(k,k))-sum; // Compute the diagonal element.
+      if (diag<-tol)                    // Is pivot less than negative tol?
+        return false;                   // Yes, so the matrix is not positive semi-definite.
+      // Allow for diag to approximate zero.
+      if (diag<=tol)                    // Is pivot less than or equal to tol?
+      {                                 // Yes, so we set the diagonal to zero.
+        C(k,k)=T{0};                    // Set the diagonal to zero if it is within tolerance.
+        continue;                       // Skip the rest of the computations for this pivot.
+      }                                 // Done checking if pivot is less than or equal to tol.
+       C(k,k)=static_cast<T>(std::sqrt(diag));// Set the diagonal to sqrt(diag).
+      // ------------------------------ //
+      // Now compute Cholesky factorization where:
+      // L(i,k)=[C(i,k)-sum{m<k} L(i,m)*L(k,m)]/L(k,k)
+      // ------------------------------ //
+      for (size_t i=k+1;i<rows;i++)     // For each row below the pivot...
+      {                                 // Start computing the Cholesky factorization.
+        long double sum2{0.0L};         // Initialize the sum to zero.
+        for (size_t m=0;m<k;m++)        // For each col in the row...
+        {                               // Start computing the sum of products.
+          if constexpr (std::is_floating_point_v<T>)// Are elems floating point?
+          {                             // Yes,
+            sum2+=C(i,m)*std::conj(C(k,m)); // Compute the sum of products.
+          }                             // Done checking if floating point.
+          else                          // Else, not floating point.
+          {                             // So we
+            sum2+=static_cast<long double>(C(i,m))*
+              static_cast<long double>(C(k,m)); // Compute the squared element.
+          }                             // Done checking if not floating point.
+        }                               // Done computing the sum of products.
+        long double num=static_cast<long double>(C(i,k))-sum2; // Compute the numerator.
+        long double denom=static_cast<long double>(C(k,k));// Get the denominator.
+        if (std::abs(denom)<tol)        // Is the denominator less than tol (zero pivot)?
+          return false;                 // Yes, so we can't divide by zero...skip it.
+        C(i,k)=static_cast<T>(num/denom); // Compute the Cholesky factorization.
+      }                                 // Done computing the Cholesky factorization.
+    }                                   // Done with all computations.
+    return true;                        // If we got here, the matrix is positive semi-definite.
+  }
   // Debug print.
   void Print(std::ostream& os = std::cout) const
   {                                     // ----------- Print ------------ //
@@ -378,7 +556,6 @@ public:
       os<<std::endl;                    // Print a newline after each row.
     }                                   // Done printing the matrix.
   }                                     // ----------- Print ------------ //
-
 private:
   // Helper function for complext transpose:
   Matrices<T> conjugateTranspose(void) const
