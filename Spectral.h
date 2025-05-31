@@ -79,8 +79,9 @@ public:
     vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap);
     vector<complex<T>> Shift(const vector<complex<T>>& s, const double fShift, const double fs);
     vector<vector<complex<T>>> Sweep (const vector<complex<T>>&s, const double fStart,const double fCenter, const double fStop,const double step,const double fs,const WindowType &w, const int wSiz, const float ovlap);
-  // In reality this can only be a real (due to magnitude) and double
-  // (to prevent aliasing).
+    // PSD should only be real to prevent aliasing and double.
+    std::pair<std::vector<T>, T>LevinsonDurbin(const std::vector<T>& r, int order) const;
+    std::vector<std::complex<T>> AR_PSD(const std::vector<T>& r, int order, int fftSize) const;
     vector<T> WelchPSD (const vector<T> &s, const WindowType& w, const int wSiz, const float ovlap, const int fftSiz);
 protected:
   // Helper Methods
@@ -373,7 +374,8 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //   returns (a[1..p], σ²) where σ² is the final prediction error.
     //   “order” = p.  We assume r.size() >= p+1.
     // ------------------------------------------------------------------------
-    std::pair<std::vector<T>, T>
+    template <typename T>
+    std::pair<std::vector<T>, T>SpectralOps<T>::
     LevinsonDurbin(const std::vector<T>& r, int order) const
     {
         // r: autocorrelation, r[0] … r[order]
@@ -429,7 +431,8 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //    at Nfft points, returning a vector<complex<T>> of length Nfft
     //    (you can take real(H) or abs(H)² as your PSD). 
     // ------------------------------------------------------------------------
-    std::vector<std::complex<T>>
+    template <typename T>
+    std::vector<std::complex<T>>::SpectralsOps<T>::
     AR_PSD(const std::vector<T>& r, int order, int fftSize) const
     {
         if (order < 1 || (int)r.size() < order+1) {
