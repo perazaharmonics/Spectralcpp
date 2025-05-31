@@ -8,11 +8,13 @@
 #define MATRIX_SOLVER_H
 #include "Matrices.h"
 #include "Vectors.h"
+#include "Spectral.h"
 #include <tuple>
 #include <complex>
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
+using std::size_t;
 
 template <typename T>
 class MatrixSolver{
@@ -34,19 +36,372 @@ public:
     // 1. The generalized case:         //
     if (B)                              // Is B nullptr?
       return GeneralizedEigen(A,*B,maxIter,tol); // Yes, solve the generalized eigenvalue problem.
-    // 2. Real symmetric / Hermitian?   //
+    // -------------------------------- //
+    // 2. If A is circulant, its eigenvalues are simply the DFT of the
+    // first row, and eigenvectors are (normalized) Fourier basis vectors.
+    // So we can do an FFT to get the eigenvalues and eigenvectors.
+    // -------------------------------- //
+    if (A.IsCircular(tol))              // Is A circulant?
+      return CirculantEigen(A);         // Yes, use the circulant eigenvalue solver.
+    // -------------------------------- //
+    // 3. If A is Toeplitz, we can use the Levinson-Durbin algorithm to solve
+    // the Toeplitz system and get the eigenvalues and eigenvectors.
+    // -------------------------------- //
+    if (A.IsToeplitz(tol))              // Is A Toeplitz?
+      return ToeplitzEigen(A,maxIter,tol);// Yes, use the Toeplitz eigenvalue solver.
+    // -------------------------------- //
+    // 4. If A is positive definite will do a Tridiagonalization and then
+    //   and use the QL algorithm to compute the eigenvalues and eigenvectors.
+    // -------------------------------- //
+    if (A.IsPositiveDefinite(tol))      // Is A positive definite?
+      return TridiagonalEigen(A,maxIter,tol); // Yes, use the tridiagonal eigenvalue solver.
+    // -------------------------------- //
+    // 5. If A is postive semi-definite we will do a "rank-revealing" Cholesky + QR
+    // on the rank deficient part of A, and then use the QL algorithm to compute
+    // the eigenvalues and eigenvectors.
+    // ------------------------------- //
+    if (A.IsSemiPositiveDefinite(tol))  // Is A positive semi-definite?
+      return SemiPositiveDefiniteEigen(A,maxIter,tol); // Yes, use the semi-positive definite eigenvalue solver.
+    // -------------------------------- //
+    // 6. Real symmetric / Hermitian?   //
+    // If A is real symmetric or Hermitian, we will use the Jacobi method for eigenvalue computation.
+    // -------------------------------- //
     if (A.IsSymmetric(tol))             // Is A Real symmetric or Hermitian?
       return JacobiEigen(A,maxIter,tol);// Yes, use the Jacobi method for eigenvalue computation.
+    // -------------------------------- //
     // Fallback to the QR iteration algorithm:
+    // -------------------------------- //
     return QREigen(A,maxIter,tol);      // No, use the QR iteration algorithm for eigenvalue computation.
   }                                     // ----------- SolveEigen ------------ //
 
-  /**
-  * TODO: Need to add a check to verify that all eigenvalues of a Covariance
-  * Matrix are real, and non-negative. In fact, should probably add various
-  * Eigenvalue properties validation functions.
-  */
+  // CirculantEigen: Uses the FFT to compute the eigenvalues and eigenvectors
+  std::pair<std::vector<T>, Matrices<std::complex<T>>>
+  CirculantEigen(const Matrices<T>& A)
+  {
+    const size_t N = A.Rows();
+    if (A.Cols() != N) {
+      throw std::invalid_argument{"CirculantEigen: Matrix must be square!"};
+    }
+    if (!A.IsCircular()) {
+      throw std::invalid_argument{"CirculantEigen: Matrix must be circulant!"};
+    }
 
+    // 1) grab the first row, build complex vector
+    std::vector<std::complex<T>> firstRow(N);
+    for (size_t j = 0; j < N; ++j) {
+      // lift real T → complex<T>
+      firstRow[j] = std::complex<T>(A(0, j), T{0});
+    }
+
+    // 2) length‐N FFT + Fourier‐basis ← SpectralOps
+    auto [eigvalsC, eigvecsC] = SpectralOps<T>::FFTStrideEig(firstRow);
+
+    // 3) form the (real) eigenvalues vector
+    std::vector<T> realVals(N);
+    for (size_t k = 0; k < N; ++k) {
+      realVals[k] = static_cast<T>(std::real(eigvalsC[k]));
+    }
+
+    // 4) pack eigenvector‐matrix (complex) into Matrices< complex<T> >
+    Matrices<std::complex<T>> Vc(N, N);
+    for (size_t i = 0; i < N; ++i) {
+      for (size_t j = 0; j < N; ++j) {
+        Vc(i, j) = eigvecsC[i][j];
+      }
+    }
+
+    return { realVals, Vc };
+  }
+  // ToeplitzEigen: Uses the Tridiagonalization algorithm to compute the eigenvalues and eigenvectors
+  std::pair<std::vector<T>, Matrices<T>>
+  ToeplitzEigen(const Matrices<T>& A,
+                int               maxIter_ = 1000,
+                T                 tol_     = T(1e-6))
+  {
+    const size_t N = A.Rows();
+    if (A.Cols() != N) {
+      throw std::invalid_argument{"ToeplitzEigen: Matrix must be square!"};
+    }
+    if (!A.IsToeplitz(tol_)) {
+      throw std::invalid_argument{"ToeplitzEigen: Matrix is not Toeplitz!"};
+    }
+    if (N == 1) {
+      // trivial 1×1 Toeplitz
+      return { std::vector<T>{ A(0,0) }, Matrices<T>(1,1) };
+    }
+    // TODO: implement a true Levinson–Durbin eigen‐solver for Toeplitz
+    return TridiagonalEigen(A, maxIter_, tol_);
+  }
+
+  
+  std::pair<std::vector<T>, Matrices<T>>
+  TridiagonalEigen(const Matrices<T>& A,
+                   int               maxIter_ = 1000,
+                   T                 tol_     = T(1e-6))
+  {
+    const size_t N = A.Rows();
+    if (A.Cols() != N) {
+      throw std::invalid_argument{"TridiagonalEigen: Matrix must be square!"};
+    }
+    if (!A.IsSymmetric(tol_)) {
+      throw std::invalid_argument{"TridiagonalEigen: Matrix is not symmetric/Hermitian!"};
+    }
+
+    // d[i] = T(i,i), e[i] = T(i, i+1) (off‐diagonal)
+    std::vector<T> d(N, T{}), e(N, T{});
+    Matrices<T>    V(N, N); 
+    V.fill(T{});
+    for (size_t i = 0; i < N; ++i) {
+      V(i, i) = T{1};
+    }
+
+    // Copy A → C so we can modify in place
+    Matrices<T> C = A;
+
+    // Householder reduction (for k=0..N-2)
+    for (size_t k = 0; k < N-1; ++k) {
+      size_t len = N - k;
+      std::vector<T> x(len);
+      for (size_t i = k; i < N; ++i) {
+        x[i - k] = C(i, k);
+      }
+      // Compute α = −sign(x[0]) * ||x||₂
+      long double sumnorm = 0.0L;
+      for (auto const& xv : x) {
+        sumnorm += std::norm(xv);
+      }
+      long double normx = std::sqrt(sumnorm);
+      if (normx < tol_) {
+        // Already zero ⇒ T(i,k)=0 for i>k
+        e[k] = T{};
+        d[k] = C(k, k);
+        continue;
+      }
+      T alpha;
+      if (x[0] == T{}) {
+        alpha = static_cast<T>(-normx);
+      } else {
+        alpha = (x[0] < T{}) ? static_cast<T>(normx) 
+                             : static_cast<T>(-normx);
+      }
+      // v = x - α e₁
+      std::vector<T> v = x;
+      v[0] -= alpha;
+      // normalize v so ||v||₂ = 1
+      long double vnorm2 = 0.0L;
+      for (auto const& vi : v) {
+        vnorm2 += std::norm(vi);
+      }
+      if (vnorm2 < tol_) {
+        e[k] = T{};
+        d[k] = C(k, k);
+        continue;
+      }
+      long double vnorm = std::sqrt(vnorm2);
+      for (auto& vi : v) {
+        vi = static_cast<T>(vi / static_cast<T>(vnorm));
+      }
+
+      // Apply H_k = I - 2 v v^H to C on rows/cols k..N-1
+      for (size_t i = k; i < N; ++i) {
+        for (size_t j = k; j < N; ++j) {
+          std::complex<T> dot = static_cast<std::complex<T>>(v[i - k]) 
+                              * std::conj(static_cast<std::complex<T>>(v[j - k]));
+          C(i, j) -= T(2) * static_cast<T>(dot);
+        }
+      }
+      // Accumulate V := V * H_k
+      for (size_t i = 0; i < N; ++i) {
+        std::complex<T> tau = T{};
+        for (size_t j = k; j < N; ++j) {
+          tau += static_cast<std::complex<T>>(V(i, j)) 
+               * std::conj(static_cast<std::complex<T>>(v[j - k]));
+        }
+        tau *= T(2);
+        for (size_t j = k; j < N; ++j) {
+          V(i, j) -= tau * std::conj(v[j - k]);
+        }
+      }
+
+      // Now C is partially tridiagonal in rows/cols ≤ k+1
+      e[k] = C(k, k+1);
+      d[k] = C(k, k);
+    }
+    // Last diagonal
+    d[N-1] = C(N-1, N-1);
+    e[N-1] = T{};
+
+    // QL iteration on tridiagonal (d[], e[]) → refine eigenvalues in d[], accumulate rotations into U
+    Matrices<T> U = V; 
+    for (size_t i = 0; i < N; ++i) {
+      if (std::abs(e[i]) < tol_) {
+        e[i] = T{};
+      }
+    }
+
+    for (size_t l = 0; l < N; ++l) {
+      int iter = 0;
+      while (true) {
+        // Find m ≥ l such that e[m] ≈ 0
+        size_t m = l;
+        while (m < N - 1 && std::abs(e[m]) > tol_) {
+          ++m;
+        }
+        if (m == l) {
+          // d[l] is already an eigenvalue
+          break;
+        }
+        if (++iter > maxIter_) {
+          throw std::runtime_error{"TridiagonalEigen: QL iteration did not converge."};
+        }
+        // Form shift μ
+        long double dl   = static_cast<long double>(d[l]);
+        long double dl1  = static_cast<long double>(d[l+1]);
+        long double el   = static_cast<long double>(e[l]);
+        long double diff = dl1 - dl;
+        long double mu   = (dl + dl1)/2.0L
+                          - static_cast<long double>(std::copysign(1.0L, diff))
+                            * std::sqrt((dl - dl1)*(dl - dl1) + 4.0L*el*el) / 2.0L;
+
+        long double p = dl - mu;
+        long double c = 1.0L, s = 0.0L;
+        for (size_t i = l; i < N - 1; ++i) {
+          long double r   = std::sqrt(p*p + static_cast<long double>(e[i])*e[i]);
+          if (r < tol_) {
+            e[i] = T{};
+            break;
+          }
+          long double c_  = p / r;
+          long double s_  = e[i] / r;
+          if (i > l) {
+            e[i - 1] = static_cast<T>(r);
+          }
+          long double d_next = static_cast<long double>(d[i + 1]);
+          long double temp   = c_ * d_next - s_ * static_cast<long double>(e[i + 1]);
+          e[i + 1]           = static_cast<T>(s_ * d_next + c_ * static_cast<long double>(e[i + 1]));
+          d[i]               = static_cast<T>( mu + r );
+          p                  = temp;
+          // Update U's columns i, i+1 by Givens [c_, s_]
+          for (size_t row = 0; row < N; ++row) {
+            T Uik  = U(row, i);
+            T Uik1 = U(row, i + 1);
+            U(row, i)   = static_cast<T>(c_ * static_cast<long double>(Uik) - s_ * static_cast<long double>(Uik1));
+            U(row, i+1) = static_cast<T>(s_ * static_cast<long double>(Uik) + c_ * static_cast<long double>(Uik1));
+          }
+        }
+        d[l] = static_cast<T>(mu + p);
+        if (std::abs(e[l]) < tol_) {
+          e[l] = T{};
+        }
+      }
+    }
+
+    // Sort (optional)
+    for (size_t i = 0; i < N - 1; ++i) {
+      size_t minIdx = i;
+      for (size_t j = i + 1; j < N; ++j) {
+        if (d[j] < d[minIdx]) {
+          minIdx = j;
+        }
+      }
+      if (minIdx != i) 
+      {
+        std::swap(d[i], d[minIdx]);
+        for (size_t row = 0; row < N; ++row) 
+        {
+          std::swap(U(row, i), U(row, minIdx));
+        }
+      }
+    }
+
+    return { d, U };
+  }
+
+  // --------------------------------------------------------------------------------
+  // (J)  SemiPositiveDefiniteEigen:  rank‐revealing pivoted Cholesky + QL
+  //       Steps:
+  //        1) Attempt a “pivoted” Cholesky on A.  If A is PSD, no negative pivots will occur.
+  //        2) Count how many pivots (diagonal entries of L) are > tol; that number is r = rank(A).
+  //        3) Extract the leading r×r principal block of A (call it A₁).  A₁ is strictly PD.
+  //        4) Run TridiagonalEigen(A₁) to get its eigenpairs (λ₁..λ_r, U₁).  
+  //        5) The remaining (N−r) eigenvalues are all zero.  Build an orthonormal basis 
+  //           for Null(A) via Gram‐Schmidt on the last (N−r) standard basis vectors, or 
+  //           simply complete U = [U₁, some orthonormal null‐basis].  
+  //       6) Return:  eigenvalue‐vector = [λ₁..λ_r, 0..0] (length N), eigenvector‐matrix U (N×N).
+  // --------------------------------------------------------------------------------
+  std::pair<std::vector<T>, Matrices<T>>
+  SemiPositiveDefiniteEigen(
+    const Matrices<T>& A,
+    int                maxIter = 1000,
+    T                  tol     = T(1e-6))
+  {
+    const size_t N = A.Rows();
+    if (A.Cols() != N)
+      throw std::invalid_argument{"SemiPositiveDefiniteEigen: Matrix must be square!"};
+    if (!A.IsSymmetric(tol))
+      throw std::invalid_argument{"SemiPositiveDefiniteEigen: Matrix must be symmetric/Hermitian!"};
+    // 1) Do a “pivoted” Cholesky directly on A, but keep track of the diagonal pivots.
+    Matrices<T> C = A;                // working copy
+    Matrices<T> L(N, N);  L.fill(T{});
+    // pivoted: we will store a vector `diag` of length N to hold diagonals of A,
+    // then each time pick the largest remaining pivot to proceed.  However, a simpler
+    // approach (assuming A is PSD) is just do a normal Cholesky and watch for any zero/negative pivot.
+    // We do a “no‐pivot” Cholesky but watch diag < tol → rank deficiency.
+    size_t r = 0;  // count of strictly positive pivots
+    for (size_t k=0;k<N;k++) 
+    {
+      long double sum = 0.0L;
+      for (size_t m = 0; m < k; m++)
+        sum += std::norm(L(k, m));
+      long double diagk=static_cast<long double>(C(k,k))-sum;
+      if (diagk<=tol) 
+      {
+        //  effectively zero (rank‐deficient)
+        break;
+      }
+      // strictly positive pivot
+      L(k, k)=static_cast<T>(std::sqrt(diagk));
+      ++r;                              // we have found the k-th pivot
+      for (size_t i=k+1;i<N;i++) 
+      {
+        long double sum2 = 0.0L;
+        for (size_t m = 0; m < k; m++)
+          sum2+=static_cast<long double>(L(i, m))*static_cast<long double>(std::conj(L(k, m)));
+        long double factor = (static_cast<long double>(C(i,k))-sum2) 
+                             / static_cast<long double>(L(k,k));
+        L(i,k)=static_cast<T>(factor);
+      }
+    }
+    // If r == 0, that means A is (numerically) zero → all eigenvalues = 0, eigenvectors = I
+    if (r == 0)
+    {
+      std::vector<T> eigvals(N, T{0});
+      Matrices<T> U(N, N); U.fill(T{});
+      for (size_t i=0;i<N;i++)
+        U(i,i) = T{1};
+      return { eigvals,U };
+    }
+    // 2) Now we know the top‐left r×r block of A is strictly PD.  Extract it:
+    Matrices<T> A1(r, r);
+    for (size_t i = 0; i < r; i++)
+      for (size_t j = 0; j < r; j++)
+        A1(i, j) = A(i, j);
+    // 3) Run a strictly‐PD eigen solver on A1
+    auto [eigvals1, U1] = TridiagonalEigen(A1,maxIter,tol);
+    // eigvals1.size() == r;  U1 is r×r (orthonormal)
+    // 4) Build the final eigenvalue vector of length N:
+    std::vector<T> eigvals(N, T{0});
+    for (size_t i=0;i<r;i++)
+      eigvals[i] = eigvals1[i];
+    Matrices<T> U(N, N);
+    U.fill(T{});
+    for (size_t i=0;i <r;i++) 
+      for (size_t j=0;j<r;j++) 
+        U(i, j) = U1(i, j);
+    for (size_t i=r;i<N;i++) 
+      U(i,i)=T{1};  // just choose coordinate axes in the nullspace
+    return { eigvals,U};
+  }  
     // LU Decomposition with partial pivoting. Returns (L,U,pivots) such that:
     // P*A=L*U, where P is a permutation matrix.
     std::tuple<Matrices<T>,Matrices<T>,std::vector<size_t>>
@@ -170,20 +525,23 @@ public:
     Matrices<T> CholeskyDecomposition(const Matrices<T>& A)
     {                                   // -------- CholeskyDecomposition ------ //
       size_t N=A.Rows();                // Get the number of rows in A.
+      if (A.Cols()!=N)                  // Is A square?
+        throw std::invalid_argument{"CholeskyDecomposition: Matrix must be square!"}; // No, so throw an error.
+      Matrices<T> C=A;                  // Copy A to C, which will hold the lower triangular matrix.
       Matrices<T> L(N,N);L.fill(T{});   // Initialize L as an NxN matrix filled with zeros.
       for (size_t i=0;i<N;i++)          // For each row in A...
       {                                 //
         for (size_t j=0;j<=i;j++)       // For each column in the current row...
         {                               // Compute the elements of L.
-          std::complex<T> sum{};        // Initialize the sum to zero.
+          std::complex<long double> sum=0.0L;// Initialize the sum to zero.
           for (size_t k=0;k<j;k++)       // For each column in the current row...
-            sum+=L(i,k)*std::conj(L(j,k));// Compute the sum of products of the elements in L.
+            sum+=static_cast<long double>L(i,k)*std::conj(static_cast<std::complex<long double>>(L(i,k)));
           if (i==j)                     // Are we on the diagonal?
           {                             // Yes, compute the diagonal element.
-            T diag=A(i,i)-sum.real();   // Compute the diagonal element of L.
-            if (diag<=T{})              // Is the diagonal element non-positive?
+            long double diag=static_cast<long double>(C(i,i))-sum.real();
+            if (diag<=0.0L)             // Is the diagonal element non-positive?
               throw std::runtime_error{"CholeskyDecomposition: Matrix is not positive definite!"}; // No, the matrix is not positive definite.
-            L(i,i)=std::sqrt(diag);     // Set the diagonal element of L to the square root of the diagonal element of A.
+            L(i,i)=static_cast<T>(std::sqrt(diag));// Set the diagonal element of L to the square root of the diagonal element of A.
           }                             // Done computing the diagonal element.
           else                          // Else we are in off-diagonal element.                          
             L(i,j)=(A(i,j)-sum)/L(j,j); // Compute the off-diagonal element of L.
@@ -337,6 +695,11 @@ private:
   {                                     // ----------- invertFromLU ------------ //
     auto& [L,U,P]=lures;                // Unpack the LU decomposition.
     size_t N=L.Rows();                  // Get the number of rows in L.
+    Matrices<T> Pmat(N,N);Pmat.fill(T{}); // Initialize the permutation matrix P as an NxN matrix filled with zeros.
+    if (U.Cols()!=N || L.Cols()!=N || L.Rows()!=N || U.Rows()!=N) // Check if L and U are square matrices.
+      throw std::invalid_argument{"invertFromLU: L and U must be square matrices!"}; // If not, throw an error.
+    if (P.size()!=N)                   // Check if P has the correct size.
+      throw std::invalid_argument{"invertFromLU: P must have size N!"}; // If not, throw an error.
     // Build the P matrix.              // P is a permutation matrix.
     for (size_t i=0;i<N;i++)            // For each row in P...
       Pmat(i,P[i])=T{1};                // Set the permutation matrix elements.
