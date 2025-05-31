@@ -29,13 +29,11 @@ public:
   // solves A*x=lambda*B*x.
   std::pair<std::vector<T>,Matrices<T>> SolveEigen(
     const Matrices<T>& A,               // The mtrix to solve for eigen-values/vectors
-    const Matrices<T>* B=nullptr,       // The matrix to solve for generalized eigen-values/vectors
-    int maxIter=1000,                   // The algorithm's maximum number of iterations
-    T tol = T(1e-6))                    // The tolerance for convergence
+    const Matrices<T>* B=nullptr)       // The matrix to solve for generalized eigen-values/vectors)                    
   {                                     // ----------- SolveEigen ------------ //
     // 1. The generalized case:         //
     if (B)                              // Is B nullptr?
-      return GeneralizedEigen(A,*B,maxIter,tol); // Yes, solve the generalized eigenvalue problem.
+      return GeneralizedEigen(A,*B,maxiters,tolerance); // Yes, solve the generalized eigenvalue problem.
     // -------------------------------- //
     // 2. If A is circulant, its eigenvalues are simply the DFT of the
     // first row, and eigenvectors are (normalized) Fourier basis vectors.
@@ -48,30 +46,30 @@ public:
     // the Toeplitz system and get the eigenvalues and eigenvectors.
     // -------------------------------- //
     if (A.IsToeplitz(tol))              // Is A Toeplitz?
-      return ToeplitzEigen(A,maxIter,tol);// Yes, use the Toeplitz eigenvalue solver.
+      return ToeplitzEigen(A,maxiters,tolerance);// Yes, use the Toeplitz eigenvalue solver.
     // -------------------------------- //
     // 4. If A is positive definite will do a Tridiagonalization and then
     //   and use the QL algorithm to compute the eigenvalues and eigenvectors.
     // -------------------------------- //
-    if (A.IsPositiveDefinite(tol))      // Is A positive definite?
+    if (A.IsPositiveDefinite(tolerance))      // Is A positive definite?
       return TridiagonalEigen(A,maxIter,tol); // Yes, use the tridiagonal eigenvalue solver.
     // -------------------------------- //
     // 5. If A is postive semi-definite we will do a "rank-revealing" Cholesky + QR
     // on the rank deficient part of A, and then use the QL algorithm to compute
     // the eigenvalues and eigenvectors.
     // ------------------------------- //
-    if (A.IsSemiPositiveDefinite(tol))  // Is A positive semi-definite?
+    if (A.IsSemiPositiveDefinite(tolerance))  // Is A positive semi-definite?
       return SemiPositiveDefiniteEigen(A,maxIter,tol); // Yes, use the semi-positive definite eigenvalue solver.
     // -------------------------------- //
     // 6. Real symmetric / Hermitian?   //
     // If A is real symmetric or Hermitian, we will use the Jacobi method for eigenvalue computation.
     // -------------------------------- //
-    if (A.IsSymmetric(tol))             // Is A Real symmetric or Hermitian?
-      return JacobiEigen(A,maxIter,tol);// Yes, use the Jacobi method for eigenvalue computation.
+    if (A.IsSymmetric(tolerance))             // Is A Real symmetric or Hermitian?
+      return JacobiEigen(A,maxiters,tolerance);// Yes, use the Jacobi method for eigenvalue computation.
     // -------------------------------- //
     // Fallback to the QR iteration algorithm:
     // -------------------------------- //
-    return QREigen(A,maxIter,tol);      // No, use the QR iteration algorithm for eigenvalue computation.
+    return QREigen(A,maxiters,tolerance);      // No, use the QR iteration algorithm for eigenvalue computation.
   }                                     // ----------- SolveEigen ------------ //
 
   // CirculantEigen: Uses the FFT to compute the eigenvalues and eigenvectors
@@ -89,11 +87,11 @@ public:
     // 1) grab the first row, build complex vector
     std::vector<std::complex<T>> firstRow(N);
     for (size_t j = 0; j < N; ++j) {
-      // lift real T → complex<T>
+      // lift real T -> complex<T>
       firstRow[j] = std::complex<T>(A(0, j), T{0});
     }
 
-    // 2) length‐N FFT + Fourier‐basis ← SpectralOps
+    // 2) length‐N FFT + Fourier‐basis SpectralOps
     auto [eigvalsC, eigvecsC] = SpectralOps<T>::FFTStrideEig(firstRow);
 
     // 3) form the (real) eigenvalues vector
@@ -155,7 +153,7 @@ public:
       V(i, i) = T{1};
     }
 
-    // Copy A → C so we can modify in place
+    // Copy A to C so we can modify in place
     Matrices<T> C = A;
 
     // Householder reduction (for k=0..N-2)
@@ -165,7 +163,7 @@ public:
       for (size_t i = k; i < N; ++i) {
         x[i - k] = C(i, k);
       }
-      // Compute α = −sign(x[0]) * ||x||₂
+      // Compute aloha = −sign(x[0]) * ||x||2
       long double sumnorm = 0.0L;
       for (auto const& xv : x) {
         sumnorm += std::norm(xv);
@@ -184,10 +182,10 @@ public:
         alpha = (x[0] < T{}) ? static_cast<T>(normx) 
                              : static_cast<T>(-normx);
       }
-      // v = x - α e₁
+      // v = x - alpha e₁
       std::vector<T> v = x;
       v[0] -= alpha;
-      // normalize v so ||v||₂ = 1
+      // normalize v so ||v||2 = 1
       long double vnorm2 = 0.0L;
       for (auto const& vi : v) {
         vnorm2 += std::norm(vi);
@@ -242,7 +240,7 @@ public:
     for (size_t l = 0; l < N; ++l) {
       int iter = 0;
       while (true) {
-        // Find m ≥ l such that e[m] ≈ 0
+        // Find m >= l such that e[m] ≈ 0
         size_t m = l;
         while (m < N - 1 && std::abs(e[m]) > tol_) {
           ++m;
