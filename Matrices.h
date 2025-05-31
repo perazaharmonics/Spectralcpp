@@ -229,9 +229,13 @@ public:
   // computations) such as the matrix already being diagonal.
   bool IsDiagonal(double tol=1e-9) const
   {                                     // ----------- IsDiagonal ------------ //
+    if (rows==0||cols==0)               // Is the matrix empty?
+      return false;                     // Yes, so it cannot be diagonal.
+    if (rows!=cols)                     // Is the matrix square?
+      return false;                     // No, so it cannot be diagonal.
     for (size_t i=0;i<rows;i++)         // For each row in the matrix...
       for (size_t j=0;j<cols;j++)       // For each column in the matrix...
-        if (i!=j&&std::abs(mat[i][j]>tol))// Are the off diagonals zero?
+        if (i!=j&&std::abs(mat[i][j])>tol)// Are the off diagonals zero?
           return false;                 // No, the matrix is not diagonal.
     return true;                        // Yes, the matrix is diagonal.
   }                                     // ----------- IsDiagonal ------------ //
@@ -240,7 +244,7 @@ public:
   // or Hermitian (A == A^H for complex matrices). Permits a dispatcher pick
   // Jacobi or tridiagonalization+QL algorithm for eigenvalue computations
   // when appropiate.
-  bool IsSymmetric(double tol=e-9) const
+  bool IsSymmetric(double tol=1e-9) const
   {                                     // ----------- IsSymmetric ------------ //
     if (rows!=cols)                     // Is the matrix is square?
       return false;                     // No, it cannot be symmetric.
@@ -265,7 +269,7 @@ public:
     Matrices<T> AHA=AH*(*this);         // Compute A^H * A.
     for (size_t i=0;i<rows;i++)         // For each row in the matrix...
       for (size_t j=0;j<cols;j++)       // For each column in the matrix...
-        if (std::abs(AAH(i,j)-AHA(i,j)>tol)) // Are the elements equal within tolerance?
+        if (std::abs(AAH(i,j)-AHA(i,j))>tol) // Are the elements equal within tolerance?
           return false;                 // No, the matrix is not normal.
     return true;                        // Else, the matrix is normal.
   }                                     // ----------- IsNormal ------------ //
@@ -276,16 +280,21 @@ public:
     if (rows!=cols)                     // Is the matrix square?
       return false;                     // No, so its not unitary either.
     Matrices<T> AH=this->conjugateTranspose(); // Get the conjugate transpose of the matrix.
-    Matrices<T> I=(*this)*AH;           // Compute A * A^H.
+    Matrices<T> product=(*this)*AH;     // Compute A * A^H.
     for (size_t i=0;i<rows;i++)         // For each row in the matrix...
     {                                   //    and..
       for (size_t j=0;j<cols;j++)       // ...for each column in the matrix...
       {                                 // Test for unitary matrix.
-        if (i==j)                       // If we are on the diagonal...
-          if (std::abs(I(i,j)-T{1})>tol) // Is it equal to 1 within tolerance?
-            return false;               // No, so its not unitary.
-        else if (std::abs(I(i,j))>tol)  // Else, is it zero within tolerance?
-          return false;                 // No, so its not unitary.
+        if (i==j)                       // Are we on the diagonal?
+        {                               // Yes so we expect it to be 1.
+          if (std::abs(product(i,j)-T{1})>tol) // Is the diagonal element not 1 within tolerance?
+            return false;               // No, so the matrix is not unitary.
+        }                               // Done checking if on diagonal.
+        else                            // Else we are off diagonals.
+        {                               // So we expect it to be zero.
+          if (std::abs(product(i,j))>tol)// Are the off-diagonal elems not zero witin tol?
+            return false;               // Yes, so the matrix is not unitary.
+        }                               // Done checking if off diagonal.
       }                                 // Done checking all elements.
     }                                   // Done testing for unitary.
     return true;                        // Else, the matrix is unitary.
@@ -296,14 +305,24 @@ public:
   {                                     // ----------- IsOrthogonal ------------ //
     if (rows!=cols)                     // Is the matrix square?
       return false;                     // No, so it's not orthogonal either.
-    Matrices<T> MMT=this->conjugateTranspose()*(*this); // Compute A * A^T.
-    Matrices<T> I(rows,cols);           // Create an identity matrix of the same size.
-    I,fill(T{});                        // Fill the identity matrix with zeros.
-    for (size_t i=0;i<rows;i++) I(i,i)=T{1}; // Set the diagonal elements to 1.
-    for (size_t i=0;i<rows;i++)         // For each row in the matrix...
-      for (size_t j=0;j<cols;j++)       // For each column in the matrix...
-        if (std::abs(MMT(i,j)-I(i,j)>tol))// Are the elemenets equal within tolerance?
-          return false;                 // No, matrix is not orthogonal.
+    Matrices<T> AT=this->conjugateTranspose(); // Get the transpose of the matrix.
+    Matrices<T> product=(*this)*AT;     // Compute A * A^T.
+    for (size_t i=0;i<rows;i++)         // For each row in the matrix....
+    {                                   // Test for orthogonality.
+      for (size_t j=0;j<rows;j++)       // For each column in the matrix...
+      {                                 //
+        if (i==j)                       // Are we on the diagonal?
+        {                               // Yes so we expect it to be 1.
+          if (std::abs(product(i,j)-T{1})>tol) // Is the diagonal element not 1 within tolerance?
+            return false;               // No, so the matrix is not orthogonal.
+        }                               // Done checking if on diagonal.
+        else                            // Else we are off diagonals.
+        {                               // So we expect it to be zero.
+          if (std::abs(product(i,j))>tol)// Are the off-diagonal elems not zero witin tol?
+            return false;               // Yes, so the matrix is not orthogonal.
+        }                               // Done checking if off diagonal.
+      }                                 // Done checking all elements.
+    }                                   // Done testing for orthogonality.
     return true;                        // Else, the matrix is orthogonal.
   }                                     // ----------- IsOrthogonal ------------ //
   // Is AntiSymmetric: Check if the matrix is anti-symmetric (A^T = -A). Helps us
@@ -315,14 +334,22 @@ public:
       return false;                     // No, so it's not anti-symmetric either.
     for (size_t i=0;i<rows;i++)         // For each row in the matrix...
     {                                   //   
-       if (std::abs(mat[i][j]>tol))     // Are the diagonals greater than zero?
-         return false                   // Then it is not anti-symmetric.
+       if (std::abs(mat[i][i])>tol)     // Are the diagonals greater than zero?
+         return false;                  // Then it is not anti-symmetric.
       for (size_t j=0;j<cols;j++)       // For each column in the mtrix...
       {                                 // Test for anti-symmetry.
-        auto a=mat[i][j];               // Matrix element at (i,j).
-        auto b=std::is_floating_point_v<T>?-mat[i][j]:-std::conj(mat[i][j]);// Conjugate for complex types.
-        if (std::abs(a-b)>tol)          // Are the elements equal within tolerane?
-          return false;                 // No, the matrix is not anti-symmetric.
+        if (i==j)                       // If we are on the diagonal...
+          continue;                     // Skip the diagonal elements.
+        if constexpr (std::is_floating_point_v<T>)// Is it a floating point?
+        {                               // Yes so factor in tolerance.
+          if (std::abs(mat[i][j]+mat[j][i])>tol)// Are the element equal within tol?
+            return false;               // No, so the matrix is not anti-symmetric.
+        }                               // Done checking if floating point.
+        else                            // Else complex skew hermitian..
+        {                               // A[i][j]=-conj(A[j][i])
+          if (std::abs(mat[i][j]+std::conj(mat[j][i]))>tol)// Are the elements equal within tol?
+            return false;               // No, so the matrix is not anti-symmetric.
+        }                               // Done checking if not floating point.
       }                                 // Done checking all elements.
     }                                   // Done testing for anti-symmetry.
     return true;                        // Else, the matrix is anti-symmetric.          
@@ -359,8 +386,8 @@ public:
     if (rows!=cols)                     // Is the matrix square?
       return false;                     // No, so it's not circulant either.
     // We store the first row of the matrix to compare with the rest.
-    const Sstd::vector<T> &firstrow=mat[0];// Store the first row of the matrix.
-    for (size t i=1;i<rows;i++)         // For each subsequent row...
+    const std::vector<T> &firstrow=mat[0];// Store the first row of the matrix.
+    for (size_t i=1;i<rows;i++)         // For each subsequent row...
     {                                   // Start testing for circulance property.
       bool foundmatch=false;            // Flag to check if we found a match.
       for (size_t shift=0;shift<cols;shift++)// For each possible shift...
@@ -368,7 +395,7 @@ public:
         std::vector<T> shiftedrow(cols);// Build shifted version of mat[i].
         for (size_t j=0;j<cols;j++)     // For each column in the row...
           shiftedrow[j]=mat[i][(j+shift)%cols];// Shift elements cyclically.
-        if constexpr (std::is_floating_pint_v<T>)// Is it a floating point vector?
+        if constexpr (std::is_floating_point_v<T>)// Is it a floating point vector?
         {                               // Yes so we should factor in tolerance.
           bool allclose=true;           // Flag to check if all elements are close.
           for (size_t j=0;j<cols;j++)   // For each column in the row....
@@ -440,9 +467,9 @@ public:
     {                                   // Begin computations...
     // Compute the sum{m=0...k-1} |C(k,m)|^2
       long double sum=0.0L;             // Initialize the sum to zero.
-      for (size_t m=0;m<rows;m++)       // For each row in the matrix.
+      for (size_t m=0;m<k;m++)          // For each row in the matrix.
       {                                 // Start testing matrix.
-        if constexpr (std::is_floating_pint_v<T>)// Are elems floating point?
+        if constexpr (std::is_floating_point_v<T>)// Are elems floating point?
         {                               // Yes so get the norm.
           sum+=std::norm(C(k,m));       // Compute the norm of the element.
         }                               // Done checking if floating point.
@@ -496,9 +523,9 @@ public:
     {                                   // Begin computations...
       // Compute the sum{m=0...k-1} |C(k,m)|^2
       long double sum=0.0L;             // Initialize the sum to zero.
-      for (size_t m=0;m<rows;m++)       // For each row in the matrix.
+      for (size_t m=0;m<k;m++)          // For each row in the matrix.
       {                                 // Start testing matrix.
-        if constexpr (std::is_floating_pint_v<T>)// Are elems floating point?
+        if constexpr (std::is_floating_point_v<T>)// Are elems floating point?
         {                               // Yes so get the norm.
           sum+=std::norm(C(k,m));       // Compute the norm of the element.
         }                               // Done checking if floating point.
@@ -567,7 +594,12 @@ private:
     Matrices<T> C(cols,rows);           // Create a new matrix with transposed dimensions.
     for (size_t i=0;i<rows;i++)         // For each row in the original matrix...
       for (size_t j=0;j<cols;j++)       // For each column in the original matrix...
-        C(j,i)=std::is_floating_pint_v<T>?mat[i][j]:std::conj(mat[i][j]); // Assign the conjugated transposed element.
+      {                                 // Assign the conjugated transposed element.
+        if constexpr (std::is_floating_point_v<T>)// Is it a floating point matrix?
+          C(j,i)=mat[i][j];             // just transpose.
+        else                            // Else it could be complex
+          C(j,i)=std::conj(mat[i][j]);  // Conjugate transpose for complex types.
+      }                                 // Done assigning elements.
     return C;                           // Return the conjugated transposed matrix.
   }                                     // --------- conjugateTranspose ----------- //
   // Data members:
