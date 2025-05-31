@@ -12,6 +12,7 @@
 #include <complex>
 #include "DSPWindows.h"
 
+
 using namespace std;
 
 #ifndef M_PI
@@ -65,6 +66,7 @@ public:
     // Spectral Transformation methods.
 
     vector<complex<T>> FFTStride(const vector<complex<T>> &s);
+    std::pair<vector<complex<T>>,vector<vector<complex<T>>>> FFTStrideEig(const vector<complex<T>> &s);
     vector<complex<T>> IFFTStride(const vector<complex<T>> &s);
     vector<complex<T>> FFT(const vector<complex<T>>& s);
     vector<complex<T>> IFFT(const vector<complex<T>>& s);
@@ -190,7 +192,6 @@ vector<complex<T>> SpectralOps<T>::TwiddleFactor(int N)
     }
     return twiddles;
 }
-
 // Get the smallest power of 2 that is greater than or equal to N
 // that can hold the input sequence for the Cooley-Tukey FFT,
 // which splits the input sequence into even and odd halves.
@@ -366,6 +367,71 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     if (i<revNdx[i])                    // If the index is less than the bit-reversed index.
       swap(s[i], s[revNdx[i]]);         // Swap the elements.             
 }                                       // End of the method.
+
+// ======================== Stride FFTs ===================================== //
+// Stride FFTs are a special case of the FFT that uses a stride to compute the FFT
+// of a signal. This is useful for signals that are not a power of 2 in length.
+// The FFTStride method computes the FFT of a signal using the Cooley-Tukey algorithm
+// with a stride. The IFFTStride method computes the IFFT of a signal using the
+// FFTStride method with the conjugate of the input signal.
+// ========================================================================== //
+// FFTStrideEig computes the FFT of a signal and returns the spectrum and the
+// eigenvectors of the FFT matrix. This is useful for computing the eigenvalues
+// and eigenvectors of the FFT matrix, which can be used for spectral analysis
+// to obtain phase information.
+template <typename T>
+std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStrideEig(const vector<complex<T>> &s)
+{
+  if (s.empty())                        // Is the input signal empty?
+    return {vector<complex<T>>(), vector<vector<complex<T>>>()}; // Yes, so return empty vectors.
+  // ---------------------------------- //
+  // Calculate the number of bits needed for the FFT rounded to the
+  // nearest upper power of 2. This is the number of stages in the FFT butterfly.
+  // ---------------------------------- //
+  const int NBits=UpperLog2(static_cast<int>(s.size())); // Get the number of bits for the FFT.
+  const int N=1<<NBits;                 // Get the FFT length as a power of 2.
+  // ---------------------------------- //
+  // Precompute the twiddle factors for the FFT.
+  // The twiddle factors are used to rotate the signal in the FFT.
+  // ---------------------------------- //
+  const vector<complex<T>> twiddles=TwiddleFactorFullN(N); // Phase-frequency vector.
+  // ---------------------------------- //
+  // Create temporary buffers for the FFT.
+  // The last buffer holds the previous stage of the FFT.
+  // The current buffer holds the current stage of the FFT.
+  // ---------------------------------- //
+  vector<complex<T>> last(N), curr(N);  // Temporary buffers for the FFT.
+  // ---------------------------------- //
+  // Copy the input signal to the last buffer, and zero-pad if necessary.
+  // ---------------------------------- //
+  copy(s.begin(), s.end(), last.begin()); // Copy the input signal to the last buffer.
+  // Zero-pad the last buffer to the FFT length.
+  if (s.size() < N)                     // Is the input signal smaller than the FFT length?
+    fill(last.begin() + s.size(), last.end(), complex<T>(0)); // Yes, so zero-pad the last buffer.
+  // ---------------------------------- //
+  // Perform the bit reversal permutation on the input signal.
+  // This reorders the input signal to prepare for the Cooley-Tukey FFT.
+  // ---------------------------------- //
+  BitReversePermutation(last, NBits);   // Perform bit reversal permutation.
+  // ---------------------------------- //
+  // Perform the FFT butterfly operation for the Cooley-Tukey FFT.
+  // This computes the FFT in-place using the last and current buffers.
+  // This is where the Cooley-Tukey FFT algorithm takes place.
+  // ---------------------------------- //
+  ForwardButterfly(last, curr, twiddles, 0, NBits); // Perform the FFT butterfly.
+  // ---------------------------------- //
+  // Here we compute the Fourier matrix and index the eigenvectors.
+  // Return the computed FFT spectrum and the eigenvectors of the FFT matrix.
+  // The eigenvectors are the Fourier basis vectors, which are the twiddle factors.
+  // ---------------------------------- //
+  vector<vector<complex<T>>> eigvecs(N, vector<complex<T>>(N)); // Create a matrix for the eigenvectors.
+  const T invsqrt=static_cast<T>(1)/sqrt(static_cast<T>(N)); // Inverse square root of N for normalization.
+  for (int k=0;k<N;k++)                // For each row in the eigenvector matrix...
+  {                                    // Compute the Fourier matrix.
+    long double angle=-2.0L*M_PI*std::static_cast<long double>(ell)*std::static_cast<long double>(k)/std::static_cast<long double>(N);
+    eigvecs[ell][k]=complex<T>(std::cos(angle),std::sin(angle))*invsqrt; // Compute the k-th eigenvector.
+  }
+}
 
 template <typename T>
 vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
