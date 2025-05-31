@@ -22,7 +22,7 @@ public:
   // Default constructor:
   MatrixSolver(void)=default;
   MatrixSolver(int iters=1000,T defaultTol=T(1e-6))
-    :maxIter(iters),tol(defaultTol){} // Constructor with max iterations and tolerance.
+    :maxiters(iters),tolerance(defaultTol){} // Constructor with max iterations and tolerance.
   ~MatrixSolver(void)=default;
 
   // Our dispatcher. SolveEigen(). If B==nullptr, solves A*x=lambda*x. Otherwise,
@@ -700,6 +700,8 @@ private:
       throw std::invalid_argument{"invertFromLU: L and U must be square matrices!"}; // If not, throw an error.
     if (P.size()!=N)                   // Check if P has the correct size.
       throw std::invalid_argument{"invertFromLU: P must have size N!"}; // If not, throw an error.
+    Matrices<T> Pmat(N,N);
+    Pmat.fill(T{});
     // Build the P matrix.              // P is a permutation matrix.
     for (size_t i=0;i<N;i++)            // For each row in P...
       Pmat(i,P[i])=T{1};                // Set the permutation matrix elements.
