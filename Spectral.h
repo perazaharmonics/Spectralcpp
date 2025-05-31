@@ -366,7 +366,95 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
   for (int i=0; i<s.size();++i)         // For all elements in the signal.
     if (i<revNdx[i])                    // If the index is less than the bit-reversed index.
       swap(s[i], s[revNdx[i]]);         // Swap the elements.             
-}                                       // End of the method.
+}                                       // End of the function.
+    // ------------------------------------------------------------------------
+    // LevinsonDurbin: Given autocorrelation r[0..p], solves for AR coefficients
+    //   r[0] a[0] + r[1] a[1] + … + r[p] a[p] = 0,    (Toeplitz system)
+    //   returns (a[1..p], σ²) where σ² is the final prediction error.
+    //   “order” = p.  We assume r.size() >= p+1.
+    // ------------------------------------------------------------------------
+    std::pair<std::vector<T>, T>
+    LevinsonDurbin(const std::vector<T>& r, int order) const
+    {
+        // r: autocorrelation, r[0] … r[order]
+        // order: AR order (p)
+        if ((int)r.size() < order+1) {
+            throw std::invalid_argument{"LevinsonDurbin: need r.size() >= order+1"};
+        }
+        std::vector<T> a(order+1, T{0}); // a[0]..a[p], we keep a[0]=1 internally
+        std::vector<T> e(order+1, T{0}); // prediction error at each stage
+        a[0] = T{1};
+        e[0] = r[0];
+        if (std::abs(e[0]) < std::numeric_limits<T>::epsilon()) {
+            // All‐zero autocorrelation → trivial
+            return { std::vector<T>(order, T{0}), T{0} };
+        }
+
+        for (int m = 1; m <= order; ++m) {
+            // Compute reflection coefficient κ_m
+            T num = r[m];                  // numerator = r[m] + sum_{i=1..m−1} a[i]·r[m−i]
+            for (int i = 1; i < m; ++i) {
+                num += a[i] * r[m - i];
+            }
+            T kappa = - num / e[m-1];
+
+            // Update a[1..m]:
+            std::vector<T> a_prev(m+1);
+            for (int i = 0; i <= m; ++i) a_prev[i] = a[i];
+            a[m] = kappa;
+            for (int i = 1; i < m; ++i) {
+                a[i] = a_prev[i] + kappa * a_prev[m - i];
+            }
+
+            // Update prediction error
+            e[m] = e[m-1] * ( T{1} - kappa * kappa );
+            if (std::abs(e[m]) < T{0}) {
+                e[m] = T{0};
+            }
+        }
+
+        // Return only a[1..p] (drop a[0]=1) and final error e[p]
+        std::vector<T> arCoeffs(order);
+        for (int i = 1; i <= order; ++i) {
+            arCoeffs[i-1] = a[i];
+        }
+        return { arCoeffs, e[order] };
+    }
+
+    // ------------------------------------------------------------------------
+    // AR_PSD: Given autocorrelation r[0..p], compute the “all‐pole” PSD estimate
+    //    at fftSize uniformly spaced frequencies [0, 2π).  We solve AR(p) via
+    //    Levinson‐Durbin, then evaluate
+    //      H(ω) = σ² / |1 + a[1] e^{-jω} + … + a[p] e^{-j p ω} |²
+    //    at Nfft points, returning a vector<complex<T>> of length Nfft
+    //    (you can take real(H) or abs(H)² as your PSD). 
+    // ------------------------------------------------------------------------
+    std::vector<std::complex<T>>
+    AR_PSD(const std::vector<T>& r, int order, int fftSize) const
+    {
+        if (order < 1 || (int)r.size() < order+1) {
+            throw std::invalid_argument{"AR_PSD: order must be ≥1 and r.size() ≥ order+1"};
+        }
+        // 1) run Levinson‐Durbin on r[0..order]
+        auto [a, sigma2] = LevinsonDurbin(r, order);
+        // a = vector length p, contains a[1],…a[p], and sigma2 = error at final stage
+
+        // 2) build PSD at fftSize freq bins
+        std::vector<std::complex<T>> psd(fftSize);
+        const T normFactor = T{2} * M_PI / static_cast<T>(fftSize);
+        for (int k = 0; k < fftSize; ++k) {
+            T omega = normFactor * static_cast<T>(k); 
+            // Evaluate denominator D(ω) = 1 + ∑_{m=1..p} a[m-1] e^{-j m ω}
+            std::complex<T> denom = T{1};
+            for (int m = 1; m <= order; ++m) {
+                denom += a[m-1] * std::exp(std::complex<T>(T{0}, -omega * static_cast<T>(m)));
+            }
+            // PSD(ω_k) = σ² / |D(ω)|²
+            std::complex<T> H = std::complex<T>(sigma2) / (denom * std::conj(denom));
+            psd[k] = H;
+        }
+        return psd;
+    }
 
 // ======================== Stride FFTs ===================================== //
 // Stride FFTs are a special case of the FFT that uses a stride to compute the FFT
