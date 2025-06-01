@@ -10,10 +10,10 @@
 #ifndef FOURIER_MATRIX_H
 #define FOURIER_MATRIX_H
 
-#include "Spectral.h"       // your FFT/IFFT routines (SpectralOps<T>)
+#include "Spectral.h"       // 
 #include "Matrices.h"       // Matrices<T> for storing full matrices
 #include "MatrixSolver.h"   // CirculantEigen via MatrixSolver<T>
-#include "Vectors.h"        // Vectors<T> if you need a vector type
+#include "Vectors.h"        // 
 
 #include <complex>
 #include <vector>
