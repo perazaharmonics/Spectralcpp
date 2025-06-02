@@ -432,7 +432,7 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //    (you can take real(H) or abs(H)² as your PSD). 
     // ------------------------------------------------------------------------
     template <typename T>
-    std::vector<std::complex<T>>::SpectralsOps<T>::
+    std::vector<std::complex<T>>SpectralsOps<T>::
     AR_PSD(const std::vector<T>& r, int order, int fftSize) const
     {
         if (order < 1 || (int)r.size() < order+1) {
