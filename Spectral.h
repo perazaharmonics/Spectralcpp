@@ -10,14 +10,15 @@
 
 #include <vector>
 #include <complex>
+#include <math.h>
 #include "DSPWindows.h"
 
 
 using namespace std;
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+//#ifndef M_PI
+//#define M_PI 3.14159265358979323846
+//#endif
 
 // Define alias templates for complex vectors and matrices.
 /*template <typename T>
