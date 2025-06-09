@@ -15,21 +15,524 @@
 
 
 using namespace std;
-
-//#ifndef M_PI
-//#define M_PI 3.14159265358979323846
-//#endif
-
-// Define alias templates for complex vectors and matrices.
-/*template<typename T>
-using complexV_t = vector<complex<T>>;
-template <typename R>
-using realV_t = vector<R>; // Template for real vectors
-template <typename M>
-using matrix_t = vector<vector<complex<M>>>; // Template for matrix vectors.*/
-
+ 
 // Class template for spectral operations
+template<typename T>
+class WaveletOps
+{
+  // The wavelets we know.
+  enum class WaveletType
+  {
+    Haar,                            // The Haar Wavelet type.
+    Db1,                             // Daubechies wavelet type 1.
+    Db6,                             // Daubechies wavelet type 6.
+    Dym5,                            // Symlet type 5
+    Sym8,                            // Symlet type 8.
+    Coif5                            // Coiflet type 5 
+  };
+  enum class ThresholdType
+  {
+    Hard,                           // Hard thresholding.
+    Soft                            // Soft thresholding.
+  };
+  public:
+    // Constructors
+    explicit WaveletOps(          // Constructor
+      WaveletType wt=WaveletType::Haar, // Our default wavelet.
+      size_t levels=1,            // Decomposition level.
+      double threshold=0.0f,      // Denoising threshold.
+      ThresholdType tt=ThresholdType::Hard)// The denoising type.
+     : wType{wt},levels{levels},threshold{threshold},tType{tt} {}
+    // ---------------------------- //
+    // Denoise: Apply multi-level DWT denoising and reconstruct signal.
+    // ---------------------------- //
+    std::vector<double> Denoise(const std::vector<double>& signal)
+    {                               // --------- Denoise --------------- //
+      // -------------------------- //
+      // 1. Zero-Pad the signal to make sure the operation is possible.
+      // -------------------------- //   
+      auto padded=pad_to_pow(signal);// Zero-pad the signal.
+      // -------------------------- //
+      // 2. Now forward DWT + threshold.
+      // -------------------------- //
+      auto coeffs=dwt_multilevel(padded,selectForward(),
+        this->levels,this->threshold,tTypeToString());
+      // -------------------------- //
+      // 3. Now perform the inverse DWT.
+      // ------------------------- //
+      auto recon=idwt_multilevel(coeffs,selectInverse());
+      // ------------------------- //
+      // 4. Remove the zero padding from the signal.
+      // ------------------------- //
+      return remove_padding(recon,signal.size());
+    }                              // ---------- Denoise ----------- 
+private:
+  WaveletType wType{Haar};       // The wavelet of choice.
+  ThresholdType tType{Hard};     // The type of thresholding.
+  size_t levels{1};              // The wavelet decomposition level.
+  double threshold{0.0f};        // The threshold of when to cancel.
+// Method to choose the correct forward wavelet function.
+  std::function<std::pair<std::vector<double>,std::vector<double>>>(const std::vector<double>&)>     
+  selectForward(void) const      // Generate the window we want.
+  {                              // -------- selectForward --------
+    switch (wType)               // Act according to the type.
+    {                            //
+      case WaveletType::Haar: return haar;// We want Haar.
+      case WaveletType::Db1:  return db1;// We want db1.
+      case WaveletType::Db6: return db6;// We want db6.
+      case WaveletType::Sym5: return sym5;// We want sym 5
+      case WaveletType::Sym8: return sym8;// We want sym 8
+      case WaveletType::Coif5: return coif5;// We want sym 5
+    }                           // Done acting according to wlet typ.
+    return haar;                // Return our default wavelet.
+  }                             // -------- selectForward --------
+// Chooses the correct inverse wavelet reconstruction
+  std::function<std::vector<double>(const std::vector<double>&, const std::vector<double>&)>
+  selectInverse(void) const   // Select the correct reconstruct wave.
+  {                           // -------- selectInverse --------
+    switch(wType)             // Act according to the wave type
+    {                         // Select the recon wavelet.
+      case WaveletType::Haar: return inv_haar;// We want Haar.
+      case WaveletType::Db1:  return inv_db1;// We want db1.
+      case WaveletType::Db6: return inv_db6;// We want db6.
+      case WaveletType::Sym5: return inv_sym5;// We want sym 5
+      case WaveletType::Sym8: return inv_sym8;// We want sym 8
+      case WaveletType::Coif5: return inv_coif5;// We want sym 5 
+    }                          // Done acting according to wtype.
+    return inv_harr;           // Return inverse of default fwd wave.
+  }                            // -------- selectInverse --------
+  // Convert enum to the string the denoiser expects.
+  std::string tTypeToString(void) const
+  {
+    return (this->ttype==ThresholdType::Hard?"hard":"soft");
+  }
+protected:
+/// Pad a signal up to the next power of two
+  inline double next_power_of_2(double x) 
+  {
+    return x == 0 ? 1 : pow(2, ceil(log2(x)));
+  }
+public:
+  vector<double> pad_to_pow2(const vector<double>& signal) 
+  {
+    size_t original_length = signal.size();
+    size_t padded_length = static_cast<size_t>(next_power_of_2(original_length));
+    vector<double> padded_signal(padded_length);
 
+    copy(signal.begin(), signal.end(), padded_signal.begin());
+    fill(padded_signal.begin() + original_length, padded_signal.end(), 0);
+
+    return padded_signal;
+  }                                                     
+/// Remove padding back to the original length
+  vector<double> remove_padding(const vector<double>& signal, size_t original_length) 
+  {
+    return vector<double>(signal.begin(), signal.begin() + original_length);
+  }
+  
+// Normalization.
+vector<double> normalize_minmax(const vector<double>& data) 
+{
+    double min_val = *min_element(data.begin(), data.end());
+    double max_val = *max_element(data.begin(), data.end());
+    vector<double> normalized_data(data.size());
+
+    transform(data.begin(), data.end(), normalized_data.begin(),
+        [min_val, max_val](double x) { return (x - min_val) / (max_val - min_val); });
+
+    return normalized_data;
+}
+
+vector<double> normalize_zscore(const vector<double>& data) 
+{
+    double mean_val = accumulate(data.begin(), data.end(), 0.0) / data.size();
+    double sq_sum = inner_product(data.begin(), data.end(), data.begin(), 0.0);
+    double std_val = sqrt(sq_sum / data.size() - mean_val * mean_val);
+    vector<double> normalized_data(data.size());
+
+    transform(data.begin(), data.end(), normalized_data.begin(),
+        [mean_val, std_val](double x) { return (x - mean_val) / std_val; });
+
+    return normalized_data;
+}
+
+vector<double> awgn(const vector<double>& signal, double desired_snr_db) 
+{
+    double signal_power = accumulate(signal.begin(), signal.end(), 0.0,
+        [](double sum, double val) { return sum + val * val; }) / signal.size();
+    double desired_noise_power = signal_power / pow(10, desired_snr_db / 10);
+    vector<double> noise(signal.size());
+
+    generate(noise.begin(), noise.end(), [desired_noise_power]() {
+        return sqrt(desired_noise_power) * ((double)rand() / RAND_MAX * 2.0 - 1.0);
+    });
+
+    vector<double> noisy_signal(signal.size());
+    transform(signal.begin(), signal.end(), noise.begin(), noisy_signal.begin(), plus<double>());
+
+    return noisy_signal;
+}
+/// Multi‐level discrete wavelet transform with hard/soft thresholding
+  vector<pair<vector<double>, vector<double>>> 
+  dwt_multilevel(vector<double>& signal, 
+    function<pair<vector<double>, vector<double>>(const vector<double>&)> wavelet_func, 
+    size_t levels, double threshold, const string& threshold_type = "hard") 
+    {
+
+      size_t n = signal.size();
+      size_t n_pad = static_cast<size_t>(next_power_of_2(n));
+      if (n_pad != n)
+        signal.resize(n_pad, 0.0);
+      vector<pair<vector<double>, vector<double>>> coeffs;
+      vector<double> current_signal = signal;
+      for (size_t i = 0; i < levels; ++i) 
+      {
+         auto [approx, detail] = wavelet_func(current_signal);
+        // Apply thresholding to the detail coefficients
+        if (threshold_type == "hard") 
+          detail = hard_threshold(detail, threshold);
+        else if (threshold_type == "soft")
+          detail = soft_threshold(detail, threshold);
+        coeffs.emplace_back(approx, detail);
+        current_signal = approx;
+
+        if (current_signal.size() < 2)
+          break;
+    }
+    return coeffs;
+}                                                                                                                         
+/// Inverse multi‐level DWT
+vector<double> 
+idwt_multilevel(vector<pair<vector<double>, vector<double>>>& coeffs, function<vector<double>(const vector<double>&, const vector<double>&)> wavelet_func) 
+{                                   // ------- idwt_multilevel ----
+    vector<double> signal = coeffs[0].first;
+    for (int i = coeffs.size() - 1; i >= 0; --i) 
+    {
+      auto [approx, detail] = coeffs[i];
+      signal = wavelet_func(approx, detail);
+    }
+
+    return signal;
+}
+
+// Normalization algorithms.
+
+/// Forward wavelet bases
+pair<vector<double>, vector<double>> haar(const vector<double>& signal) 
+{
+    const vector<double> h = { 1 / sqrt(2), 1 / sqrt(2) };
+    const vector<double> g = { 1 / sqrt(2), -1 / sqrt(2) };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = h[0] * signal[2 * i] + h[1] * signal[2 * i + 1];
+        detail[i] = g[0] * signal[2 * i] + g[1] * signal[2 * i + 1];
+    }
+
+    return make_pair(approx, detail);
+}                                     
+pair<vector<double>, vector<double>> db1(const vector<double>& signal) 
+{
+    const vector<double> h = {
+        (1 + sqrt(3)) / 4, (3 + sqrt(3)) / 4, (3 - sqrt(3)) / 4, (1 - sqrt(3)) / 4
+    };
+    const vector<double> g = { h[3], -h[2], h[1], -h[0] };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = 0;
+        detail[i] = 0;
+        for (size_t k = 0; k < h.size(); ++k) 
+        {
+            size_t index = 2 * i + k - h.size() / 2 + 1;
+            if (index < signal.size()) {
+                approx[i] += h[k] * signal[index];
+                detail[i] += g[k] * signal[index];
+            }
+        }
+    }
+
+    return make_pair(approx, detail);
+}                                     
+pair<vector<double>, vector<double>> db6(const vector<double>& signal) 
+{
+    const vector<double> h = {
+        -0.001077301085308,
+        0.0047772575109455,
+        0.0005538422011614,
+        -0.031582039318486,
+        0.027522865530305,
+        0.097501605587322,
+        -0.129766867567262,
+        -0.226264693965440,
+        0.315250351709198,
+        0.751133908021095,
+        0.494623890398453,
+        0.111540743350109
+    };
+    const vector<double> g = {
+        h[11], -h[10], h[9], -h[8], h[7], -h[6], h[5], -h[4], h[3], -h[2], h[1], -h[0]
+    };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = 0;
+        detail[i] = 0;
+        for (size_t k = 0; k < h.size(); ++k) {
+            size_t index = 2 * i + k - h.size() / 2 + 1;
+            if (index < signal.size()) {
+                approx[i] += h[k] * signal[index];
+                detail[i] += g[k] * signal[index];
+            }
+        }
+    }
+
+    return make_pair(approx, detail);
+}                                     
+pair<vector<double>, vector<double>> sym5(const vector<double>& signal) 
+{
+    const vector<double> h = {
+        0.027333068345078, 0.029519490925774, -0.039134249302383,
+        0.199397533977394, 0.723407690402421, 0.633978963458212,
+        0.016602105764522, -0.175328089908450, -0.021101834024759,
+        0.019538882735287
+    };
+    const vector<double> g = {
+        h[9], -h[8], h[7], -h[6], h[5], -h[4], h[3], -h[2], h[1], -h[0]
+    };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = 0;
+        detail[i] = 0;
+        for (size_t k = 0; k < h.size(); ++k) {
+            size_t index = 2 * i + k - h.size() / 2 + 1;
+            if (index < signal.size()) {
+                approx[i] += h[k] * signal[index];
+                detail[i] += g[k] * signal[index];
+            }
+        }
+    }
+
+    return make_pair(approx, detail);
+}
+                                    
+pair<vector<double>, vector<double>> sym8(const vector<double>& signal) 
+{
+    const vector<double> h = {
+        -0.003382415951359, -0.000542132331635, 0.031695087811492,
+        0.007607487325284, -0.143294238350809, -0.061273359067908,
+        0.481359651258372, 0.777185751700523, 0.364441894835331,
+        -0.051945838107709, -0.027219029917056, 0.049137179673476,
+        0.003808752013890, -0.014952258336792, -0.000302920514551,
+        0.001889950332900
+    };
+    const vector<double> g = {
+        h[15], -h[14], h[13], -h[12], h[11], -h[10], h[9], -h[8],
+        h[7], -h[6], h[5], -h[4], h[3], -h[2], h[1], -h[0]
+    };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = 0;
+        detail[i] = 0;
+        for (size_t k = 0; k < h.size(); ++k) {
+            size_t index = 2 * i + k - h.size() / 2 + 1;
+            if (index < signal.size()) {
+                approx[i] += h[k] * signal[index];
+                detail[i] += g[k] * signal[index];
+            }
+        }
+    }
+
+    return make_pair(approx, detail);
+}
+
+pair<vector<double>, vector<double>> coif5(const vector<double>& signal) 
+{
+    const vector<double> h = {
+        -0.000720549445364, -0.001823208870703, 0.005611434819394,
+        0.023680171946334, -0.059434418646456, -0.076488599078311,
+        0.417005184421393, 0.812723635445542, 0.386110066821162,
+        -0.067372554721963, -0.041464936781959, 0.016387336463522
+    };
+    const vector<double> g = {
+        h[11], -h[10], h[9], -h[8], h[7], -h[6], h[5], -h[4],
+        h[3], -h[2], h[1], -h[0]
+    };
+
+    size_t n = signal.size() / 2;
+    vector<double> approx(n), detail(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        approx[i] = 0;
+        detail[i] = 0;
+        for (size_t k = 0; k < h.size(); ++k) {
+            size_t index = 2 * i + k - h.size() / 2 + 1;
+            if (index < signal.size()) {
+                approx[i] += h[k] * signal[index];
+                detail[i] += g[k] * signal[index];
+            }
+        }
+    }
+
+    return make_pair(approx, detail);
+}
+                                   
+
+/// Inverse wavelet reconstruction
+vector<double> inverse_haar(const vector<double>& approx, const vector<double>& detail) 
+{
+    const vector<double> h_inv = { 0.7071067811865476, 0.7071067811865476 };
+    const vector<double> g_inv = { -0.7071067811865476, 0.7071067811865476 };
+
+    vector<double> reconstructed_signal;
+    for (size_t i = 0; i < approx.size(); ++i) {
+        reconstructed_signal.push_back(approx[i] * h_inv[0] + detail[i] * g_inv[0]);
+        reconstructed_signal.push_back(approx[i] * h_inv[1] + detail[i] * g_inv[1]);
+    }
+
+    return reconstructed_signal;
+}
+
+vector<double> inverse_db6(const vector<double>& approx, const vector<double>& detail) 
+{
+    const vector<double> h_inv = {
+        0.111540743350109, 0.494623890398453, 0.751133908021095,
+        0.315250351709198, -0.226264693965440, -0.129766867567262,
+        0.097501605587322, 0.027522865530305, -0.031582039318486,
+        0.0005538422011614, 0.0047772575109455, -0.001077301085308
+    };
+    const vector<double> g_inv = {
+        h_inv[11], -h_inv[10], h_inv[9], -h_inv[8], h_inv[7], -h_inv[6],
+        h_inv[5], -h_inv[4], h_inv[3], -h_inv[2], h_inv[1], -h_inv[0]
+    };
+
+    vector<double> reconstructed_signal(2 * approx.size(), 0.0);
+    for (size_t i = 0; i < approx.size(); ++i) {
+        for (size_t k = 0; k < h_inv.size(); ++k) {
+            size_t index = (2 * i + k - h_inv.size() / 2 + 1);
+            if (index < reconstructed_signal.size()) {
+                reconstructed_signal[index] += approx[i] * h_inv[k] + detail[i] * g_inv[k];
+            }
+        }
+    }
+
+    return reconstructed_signal;
+}
+
+vector<double> inverse_sym5(const vector<double>& approx, const vector<double>& detail) 
+{
+    const vector<double> h_inv = {
+        0.019538882735287, -0.021101834024759, -0.175328089908450,
+        0.016602105764522, 0.633978963458212, 0.723407690402421,
+        0.199397533977394, -0.039134249302383, 0.029519490925774,
+        0.027333068345078
+    };
+    const vector<double> g_inv = {
+        h_inv[9], -h_inv[8], h_inv[7], -h_inv[6], h_inv[5], -h_inv[4],
+        h_inv[3], -h_inv[2], h_inv[1], -h_inv[0]
+    };
+
+    vector<double> reconstructed_signal(2 * approx.size(), 0.0);
+    for (size_t i = 0; i < approx.size(); ++i) {
+        for (size_t k = 0; k < h_inv.size(); ++k) {
+            size_t index = (2 * i + k - h_inv.size() / 2 + 1);
+            if (index < reconstructed_signal.size()) {
+                reconstructed_signal[index] += approx[i] * h_inv[k] + detail[i] * g_inv[k];
+            }
+        }
+    }
+
+    return reconstructed_signal;
+}
+
+vector<double> inverse_sym8(const vector<double>& approx, const vector<double>& detail) 
+{
+    const vector<double> h_inv = {
+        0.001889950332900, -0.000302920514551, -0.014952258336792,
+        0.003808752013890, 0.049137179673476, -0.027219029917056,
+        -0.051945838107709, 0.364441894835331, 0.777185751700523,
+        0.481359651258372, -0.061273359067908, -0.143294238350809,
+        0.007607487325284, 0.031695087811492, -0.000542132331635,
+        -0.003382415951359
+    };
+    const vector<double> g_inv = {
+        h_inv[15], -h_inv[14], h_inv[13], -h_inv[12], h_inv[11], -h_inv[10],
+        h_inv[9], -h_inv[8], h_inv[7], -h_inv[6], h_inv[5], -h_inv[4],
+        h_inv[3], -h_inv[2], h_inv[1], -h_inv[0]
+    };
+
+    vector<double> reconstructed_signal(2 * approx.size(), 0.0);
+    for (size_t i = 0; i < approx.size(); ++i) {
+        for (size_t k = 0; k < h_inv.size(); ++k) {
+            size_t index = (2 * i + k - h_inv.size() / 2 + 1);
+            if (index < reconstructed_signal.size()) {
+                reconstructed_signal[index] += approx[i] * h_inv[k] + detail[i] * g_inv[k];
+            }
+        }
+    }
+
+    return reconstructed_signal;
+}
+
+vector<double> inverse_coif5(const vector<double>& approx, const vector<double>& detail) 
+{
+    const vector<double> h_inv = {
+        0.016387336463522, -0.041464936781959, -0.067372554721963,
+        0.386110066821162, 0.812723635445542, 0.417005184421393,
+        -0.076488599078311, -0.059434418646456, 0.023680171946334,
+        0.005611434819394, -0.001823208870703, -0.000720549445364
+    };
+    const vector<double> g_inv = {
+        h_inv[11], -h_inv[10], h_inv[9], -h_inv[8], h_inv[7], -h_inv[6],
+        h_inv[5], -h_inv[4], h_inv[3], -h_inv[2], h_inv[1], -h_inv[0]
+    };
+
+    vector<double> reconstructed_signal(2 * approx.size(), 0.0);
+    for (size_t i = 0; i < approx.size(); ++i) {
+        for (size_t k = 0; k < h_inv.size(); ++k) {
+            size_t index = (2 * i + k - h_inv.size() / 2 + 1);
+            if (index < reconstructed_signal.size()) {
+                reconstructed_signal[index] += approx[i] * h_inv[k] + detail[i] * g_inv[k];
+            }
+        }
+    }
+
+    return reconstructed_signal;
+}
+
+vector<double> hard_threshold(const vector<double>& detail, double threshold) 
+{
+    vector<double> result(detail.size());
+    transform(detail.begin(), detail.end(), result.begin(), [threshold](double coeff) {
+        return abs(coeff) < threshold ? 0.0 : coeff;
+    });
+    return result;
+}
+
+vector<double> soft_threshold(const vector<double>& detail, double threshold) 
+{
+    vector<double> result(detail.size());
+    transform(detail.begin(), detail.end(), result.begin(), [threshold](double coeff) {
+        return signbit(coeff) ? -max(0.0, abs(coeff) - threshold) : max(0.0, abs(coeff) - threshold);
+    });
+    return result;
+}  
+  
+
+  
+};
 
 template<typename T>
 class SpectralOps
