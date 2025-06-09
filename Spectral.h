@@ -21,7 +21,7 @@ using namespace std;
 //#endif
 
 // Define alias templates for complex vectors and matrices.
-/*template <typename T>
+/*template<typename T>
 using complexV_t = vector<complex<T>>;
 template <typename R>
 using realV_t = vector<R>; // Template for real vectors
@@ -29,10 +29,9 @@ template <typename M>
 using matrix_t = vector<vector<complex<M>>>; // Template for matrix vectors.*/
 
 // Class template for spectral operations
-template <typename T>
-class Window;
 
-template <typename T>
+
+template<typename T>
 class SpectralOps
 {
     using WindowType = typename Window<T>::WindowType; // Alias for WindowType
@@ -47,21 +46,16 @@ public:
 
     // Accessors
     const inline vector<T> GetSignal (void) const { return signal; }
-    inline void SetSignal (const vector<complex<T>>& s) {singal=s;}
+    inline void SetSignal (const vector<complex<T>>& s) {signal=s;}
     const inline int GetSamples (void) const { return length; }
     inline void SetSamples (const int N) {length=N;}
     const inline double GetSampleRate (void) const { return sRate; }
     inline void SetSampleRate (const double fs) {sRate=fs;}
     const inline vector<complex<T>> GetTwiddles (void) const { return twiddles; }
-    inline void SetSubCarrier const (const vector<complex<T>> &s) { subCarrier = s; }
+    inline void SetSubCarrier(const vector<complex<T>> &s) { subCarrier = s; }
     const inline vector<complex<T>> GetSubCarrier (void) { return subCarrier; } 
     
-     // Operator Overloads
-    vector<complex<T>> operator*(const vector<complex<T>> &s, const vector<complex<T>> &h);
-    vector<complex<T>> operator*(const vector<complex<T>> &s, const vector<T> &h);
-    vector<complex<T>> operator*(const vector<T> &s, const vector<complex<T>> &h);
-    vector<complex<T>> operator*(const vector<T> &s, const vector<T> &h);
-    vector<complex<T>> operator+(const vector<complex<T>> &s, const vector<complex<T>> &y);
+
    
     
     // Spectral Transformation methods.
@@ -79,12 +73,13 @@ public:
     vector<complex<T>> OLAProcessor(const vector<complex<T>> &s,const WindowType &w, const int wSiz, const float ovlap);
     vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap);
     vector<complex<T>> Shift(const vector<complex<T>>& s, const double fShift, const double fs);
-    vector<vector<complex<T>>> Sweep (const vector<complex<T>>&s, const double fStart,const double fCenter, const double fStop,const double step,const double fs,const WindowType &w, const int wSiz, const float ovlap);
+    vector<vector<complex<T>>> Sweep (const vector<complex<T>>&s,const double fStart,const double fCenter,const double fStop,const double step,const double fs,const WindowType &w,const int wSiz,const float ovlap);
     // PSD should only be real to prevent aliasing and double.
     std::pair<std::vector<T>, T>LevinsonDurbin(const std::vector<T>& r, int order) const;
-    std::vector<std::complex<T>> AR_PSD(const std::vector<T>& r, int order, int fftSize) const;
+    std::vector<std::complex<T>> AR_PSD(const std::vector<T>& r, int order, int fftsize) const;
     vector<T> WelchPSD (const vector<T> &s, const WindowType& w, const int wSiz, const float ovlap, const int fftSiz);
-protected:
+
+    protected:
   // Helper Methods
     int UpperLog2(const int N);
     void ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &twiddles, const int rot, const int nBits);
@@ -97,13 +92,13 @@ protected:
     vector<double> ToReal (const vector<complex<T>> &s);    
 
 private:
-    vector<complex<T>> TwiddleFactor(int N); // Precompute the Twiddle for the FFT.
+    vector<complex<T>> TwiddleFactor(int N); // Precompute the twiddles for the FFT.
     vector<T> signal;                        // The signal to process.
     vector<T> subCarrier;                    // 
     WindowType window;                       // The window to apply to the signal.
     const int windowSize;                    // The size of the window.
     const float overlap;                     // The overlap factor.
-    vector<complex<T>> twiddles;             // Precomputed twiddle factors.
+    vector<complex<T>> twiddles;             // Precomputed twiddles factors.
     const double sRate;                      // The rate at which we sampled the RF.
     const int length;                        // The length of the signal.
 };
@@ -111,103 +106,59 @@ private:
 // ------------------------------------ //
 // Constructors and Destructors
 // ------------------------------------ //
-template <typename T>
-SpectralOps<T>::SpectralOps(void) : signal{T(0)}, length{0}, sFreq{0.0}, window{WindowType::Rectangular}, windowSize{0}, overlap{0.5}
-{
-    // No window generation is needed for this constructor
-}
 
-template <typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s) : signal{s}, length{0}, sFreq{0.0}, window{WindowType::Rectangular}, windowSize{0}, overlap{0.5}
-{
-    // No window generation is needed for this constructor
-}
-
-template <typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s, const double fs, const int len) : signal{s}, length{len}, samplingFreq{fs}, window{WindowType::Rectangular}, windowSize{0}, overlap{0.5}
-{
-    // No window generation is needed for this constructor
-}
-
-template <typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize) : signal{s}, length{0}, samplingFreq{0.0}, window{w}, windowSize{windowSize}, overlap{0.5}
+template<typename T>
+SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{0.5}
 {
     // Generate the appropriate window for the given window size
-    window = GenerateWindow(window, windowSize);
+    this->window = w.SetWindowType(window, windowSize);
 }
 
-template <typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize, const int overlap) : signal{s}, length{0}, samplingFreq{0.0}, window{w}, windowSize{windowSize}, overlap{overlap}
+template<typename T>
+SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize, const int overlap) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{overlap}
 {
     // Generate the appropriate window for the given window size
-    window = GenerateWindow(window, windowSize);
+    this->window=w.SetWindowType(window, windowSize);
 }
 
-template <typename T>
+template<typename T>
 SpectralOps<T>::~SpectralOps(void)
 {
     signal.clear();
     twiddles.clear();
-}
-// ======================= Operator Overload ================================ //
-// Methods to manipulate the signals using C++ overloaded operators.
-// ========================================================================== //
-// Add two signals in the time domain.
-template <typename T>
-vector<complex<T>> operator+(const vector<complex<T>> &s, const vector<complex<T>> &y)
-{
-    vector<complex<T>> out;
-    const T subCarrier = GetSubCarrier();      // Define the subcarrier frequency
-    const T fs = GetSampleRate();      // Assume the sample rate corresponds to the size of the first signal
-
-    if (s.size() != y.size()) 
-    {
-        cerr<<"Signals must be of the same size to add them."<<endl;
-    }
-
-    out.resize(s.size());
-
-    for (size_t i = 0; i < s.size(); ++i) 
-    {
-      // Compute the complex exponential for the subcarrier modulation
-      complex<T> modulator = polar(1.0, -2.0 * M_PI * subCarrier * i / fs);
-        
-      // Combine the two signals by adding the modulated subcarrier signal
-      out[i] = s[i] + y[i] * modulator;
-    }
-
-    return out;
 }
 
 
 // ======================== Utility Methods ================================= //
 // Utility Methods to precompute operations needed for Spectral Manipulations.
 // ========================================================================== //
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>::TwiddleFactor(int N)
 {
-    if (twiddles.size() != N / 2)                        // Did we precompute N/2 twiddle before?
+    if (twiddles.size() != N / 2)                        // Did we precompute N/2 twiddles before?
     {                                                    // No, so we..
-        twiddles.resize(N / 2);                          // Resize the twiddle factor vector.
+        twiddles.resize(N / 2);                          // Resize the twiddles factor vector.
         for (int i = 0; i < N / 2; ++i)                  //  loop for the N/2 points and
-            twiddles[i] = polar(1.0, -2 * M_PI * i / N); //  compute the twiddle factors.
+            twiddles[i] = polar(1.0, -2 * M_PI * i / N); //  compute the twiddles factors.
     }
     return twiddles;
 }
 // Get the smallest power of 2 that is greater than or equal to N
 // that can hold the input sequence for the Cooley-Tukey FFT,
 // which splits the input sequence into even and odd halves.
-template <typename T>
+template<typename T>
 int SpectralOps<T>::UpperLog2(const int N)
 {
     for (int i = 0; i < 30; ++i) // For the first 30 powers of 2
+    {                            // Compute the power of 2 as 2^i
       const int mask = 1 << i;   // Compute the value of 2^i
-    if (mask >= N)               // If the power of 2 is >= N
+      if (mask >= N)             // If the power of 2 is >= N
         return i;                // Return the smallest power of 2 (i).
+    }                            //
     return 30;                   // Else return 30 as the upper bound.
 }
 
-template <typename T>
+template<typename T>
 vector<int>SpectralOps<T>::ToInt(const vector<complex<T>> &s)
 {
     vector<int> sInt(s.size());
@@ -216,7 +167,7 @@ vector<int>SpectralOps<T>::ToInt(const vector<complex<T>> &s)
     return sInt;
 }
 
-template <typename T>
+template<typename T>
 vector<double> SpectralOps<T>::ToReal(const vector<complex<T>> &s)
 {
     vector<double> sReal(s.size());
@@ -225,13 +176,13 @@ vector<double> SpectralOps<T>::ToReal(const vector<complex<T>> &s)
     return sReal;
 }
 // Determine the amount of frequency bins to analyze per second of data.
-template <typename T>
+template<typename T>
 vector<T> SpectralOps<T>::SetRBW(double rbw, double fs)
 {
   const int wSiz=static_cast<int>(fs/rbw);
   // Window is assumed to have been defined by the caller before calling this
   // method.
-  return GenerateWindow(window,wSiz);
+  return GetWindow(window,wSiz);
 }
 
 // ==================== Stride Permutation FFTs ============================= //
@@ -244,12 +195,12 @@ vector<T> SpectralOps<T>::SetRBW(double rbw, double fs)
 /* @param curr: The temporary buffer for the FFT in this iteration.
 /*   Frequency domain spectrum in the last iteration iff FFT
 /*   Time domain signal in the last iteration iff IFFT.
-/* @param twiddles: Vector of precomputed twiddle factors.
+/* @param twiddles: Vector of precomputed twiddles factors.
 /* @param rot: The current stage of the FFT, iteration indicator. Starts at 0 for the first stage.
 /* @param nBits: log2(N) where N is the length of the signal, total number of FFT stages.
 /* Reference: https://github.com/AndaOuyang/FFT/blob/main/fft.cpp
 */
-template <typename T>
+template<typename T>
 void SpectralOps<T>::ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &twiddles, const int rot, const int nBits)
 {
   if (rot == nBits)                          // Are we at the last stage of the FFT?
@@ -285,11 +236,11 @@ void SpectralOps<T>::ForwardButterfly(vector<T> &last, vector<T> &curr, const ve
         const int evenNdx = base + j;        // Even index in the butterfly group.
         const int oddNdx = base + sectSiz / 2 + j;// Odd index in the butterfly group.
     // ------------------------------------- //
-    // Multiply the odd element by the twiddle factor for this butterfly group.  
-    // The twiddle factor is a complex number that rotates the odd index.
+    // Multiply the odd element by the twiddles factor for this butterfly group.  
+    // The twiddles factor is a complex number that rotates the odd index.
     // and introduces the phase shift needed for the FFT. 
     // ------------------------------------- //   
-        last[oddNdx] *= twiddles[j * phases];// Multiply the odd index by the twiddle factor.
+        last[oddNdx] *= twiddles[j * phases];// Multiply the odd index by the twiddles factor.
     // ------------------------------------- //
     // Combine the next stage of the FFT using the even and odd indices.
     // The even and odd indices are combined to form the next stage of the FFT.
@@ -305,7 +256,7 @@ void SpectralOps<T>::ForwardButterfly(vector<T> &last, vector<T> &curr, const ve
   ForwardButterfly(curr, last, twiddles, rot + 1, nBits); // Recurse to the next stage.
 }
 // Bit reversal permutation for the Cooley-Tukey FFT algorithm.
-template <typename T>
+template<typename T>
 void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
 {
     // -------------------------------- //
@@ -375,7 +326,7 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //   returns (a[1..p], σ²) where σ² is the final prediction error.
     //   “order” = p.  We assume r.size() >= p+1.
     // ------------------------------------------------------------------------
-    template <typename T>
+    template<typename T>
     std::pair<std::vector<T>, T>SpectralOps<T>::
     LevinsonDurbin(const std::vector<T>& r, int order) const
     {
@@ -426,15 +377,15 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
 
     // ------------------------------------------------------------------------
     // AR_PSD: Given autocorrelation r[0..p], compute the “all‐pole” PSD estimate
-    //    at fftSize uniformly spaced frequencies [0, 2π).  We solve AR(p) via
+    //    at fftsize uniformly spaced frequencies [0, 2π).  We solve AR(p) via
     //    Levinson‐Durbin, then evaluate
     //      H(ω) = σ² / |1 + a[1] e^{-jω} + … + a[p] e^{-j p ω} |²
     //    at Nfft points, returning a vector<complex<T>> of length Nfft
     //    (you can take real(H) or abs(H)² as your PSD). 
     // ------------------------------------------------------------------------
-    template <typename T>
-    std::vector<std::complex<T>>SpectralsOps<T>::
-    AR_PSD(const std::vector<T>& r, int order, int fftSize) const
+    template<typename T>
+    std::vector<std::complex<T>>SpectralOps<T>::
+    AR_PSD(const std::vector<T>& r, int order, int fftsize) const
     {
         if (order < 1 || (int)r.size() < order+1) {
             throw std::invalid_argument{"AR_PSD: order must be ≥1 and r.size() ≥ order+1"};
@@ -443,10 +394,10 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
         auto [a, sigma2] = LevinsonDurbin(r, order);
         // a = vector length p, contains a[1],…a[p], and sigma2 = error at final stage
 
-        // 2) build PSD at fftSize freq bins
-        std::vector<std::complex<T>> psd(fftSize);
-        const T normFactor = T{2} * M_PI / static_cast<T>(fftSize);
-        for (int k = 0; k < fftSize; ++k) {
+        // 2) build PSD at fftsize freq bins
+        std::vector<std::complex<T>> psd(fftsize);
+        const T normFactor = T{2} * M_PI / static_cast<T>(fftsize);
+        for (int k = 0; k < fftsize; ++k) {
             T omega = normFactor * static_cast<T>(k); 
             // Evaluate denominator D(ω) = 1 + ∑_{m=1..p} a[m-1] e^{-j m ω}
             std::complex<T> denom = T{1};
@@ -460,6 +411,7 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
         return psd;
     }
 
+
 // ======================== Stride FFTs ===================================== //
 // Stride FFTs are a special case of the FFT that uses a stride to compute the FFT
 // of a signal. This is useful for signals that are not a power of 2 in length.
@@ -471,7 +423,7 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
 // eigenvectors of the FFT matrix. This is useful for computing the eigenvalues
 // and eigenvectors of the FFT matrix, which can be used for spectral analysis
 // to obtain phase information.
-template <typename T>
+template<typename T>
 std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStrideEig(const vector<complex<T>> &s)
 {
   if (s.empty())                        // Is the input signal empty?
@@ -509,18 +461,23 @@ std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStri
   // ---------------------------------- //
   // Here we compute the Fourier matrix and index the eigenvectors.
   // Return the computed FFT spectrum and the eigenvectors of the FFT matrix.
-  // The eigenvectors are the Fourier basis vectors, which are the twiddle factors.
+  // The eigenvectors are the Fourier basis vectors, which are the twiddles factors.
   // ---------------------------------- //
   vector<vector<complex<T>>> eigvecs(N, vector<complex<T>>(N)); // Create a matrix for the eigenvectors.
   const T invsqrt=static_cast<T>(1)/sqrt(static_cast<T>(N)); // Inverse square root of N for normalization.
-  for (int k=0;k<N;k++)                // For each row in the eigenvector matrix...
-  {                                    // Compute the Fourier matrix.
-    long double angle=-2.0L*M_PI*std::static_cast<long double>(ell)*std::static_cast<long double>(k)/std::static_cast<long double>(N);
-    eigvecs[ell][k]=complex<T>(std::cos(angle),std::sin(angle))*invsqrt; // Compute the k-th eigenvector.
-  }
+  for (int ell=0;ell<N;ell++)           // For each row...
+  {                                     // Compute the eigenvector for the row.
+  // The row index ell corresponds to the frequency bin in the FFT.
+      for (int k=0;k<N;k++)             // For each col in the eigenvector matrix...
+    {                                   // Compute the Fourier matrix.
+      long double angle=-2.0L*M_PI*(static_cast<long double>(ell))*(static_cast<long double>(k))/(static_cast<long double>(N));
+      eigvecs[ell][k]=complex<T>(std::cos(angle),std::sin(angle))*invsqrt; // Compute the k-th eigenvector.
+    }                                   // End of the loop.
+  }                                     // End of the loop.
+  return {curr, eigvecs};               // Return the computed FFT spectrum and the eigenvectors.
 }
 
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
 {
     // ---------------------------------- //
@@ -539,8 +496,8 @@ vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
     // ---------------------------------- //
     const int N=1<<nBits;                 // Get the FFT length as a power of 2.
     // ---------------------------------- //
-    // Precompute the twiddle factors for the FFT.
-    // The twiddle factors are used to rotate the signal in the FFT.
+    // Precompute the twiddles factors for the FFT.
+    // The twiddles factors are used to rotate the signal in the FFT.
     // ---------------------------------- //
     const vector<complex<T>> twiddles=TwiddleFactor(N); // Phase-frequency vector.
     // ---------------------------------- //
@@ -571,10 +528,9 @@ vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
         return curr;                      // Yes, so return the current buffer.
     return last;                          // No, so return the last buffer.
 }
-template <typename T>
 // The IFFT can be computed using the FFT with flipped order of the 
 // frequency bins. That is, the complex conjugate of the input signal.
-//   and thus the twiddle factors.
+//   and thus the twiddles factors.
 // So we just flip the frequency spectrum an normalize by 1/N.
 // ------------------------------------------------------------
 // Theorem: Let x[n] denote a time-domain signal and X[k] denote a frequency
@@ -585,6 +541,7 @@ template <typename T>
 // We know that FFT is circularly periodic, thus X[m]=X[-k]=X[n-k]. 
 // Therefore we can get X[m], simply by reversing the order of X[k].
 // --------------------------------------------------------------
+template<typename T>
 vector<complex<T>> SpectralOps<T>:: IFFTStride (const vector<complex<T>>& s)
 {
   vector<complex<T>> sConj(s);          // Copy the input signal.
@@ -613,9 +570,9 @@ vector<complex<T>> SpectralOps<T>:: IFFTStride (const vector<complex<T>>& s)
 // 2. Conquer the signal; we recursively apply the FFT on both halves:
 //      X_even(k) = FFT(evenT)
 //      X_odd(k) = FFT(oddT)
-// 3. Now we precompute the twiddle factors, this saves A LOT of time:
+// 3. Now we precompute the twiddles factors, this saves A LOT of time:
 //      TwiddleFactor(k) = exp( -j * (2*pi/n)*k)
-// 4. Having the Twiddle Factors we compute the FFT butterfly to obtain the full
+// 4. Having the twiddles Factors we compute the FFT butterfly to obtain the full
 //    frequency spectrum - the amplitude and phase of sines and cosines that
 //    composit it.
 //      for (k.begin; k.end/2)
@@ -626,7 +583,7 @@ vector<complex<T>> SpectralOps<T>:: IFFTStride (const vector<complex<T>>& s)
 // Note that this algorithm should be slower than the FFT Stride above, but it 
 // is also clearer. 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
 {
   const int N=s.size();                 // The length of the input signal.
@@ -650,7 +607,7 @@ vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
   vector<complex<T>> evenF=FFT(evenT);  // Transform even samples.
   vector<complex<T>> oddF=FFT(oddT);    // Transform odd samples.
     // -------------------------------- //
-    // Precompute the twiddle factors.
+    // Precompute the twiddles factors.
     // -------------------------------- //
   vector<complex<T>> tf=TwiddleFactor(N);// Get the phase-freq rotation vector.
     // -------------------------------- //
@@ -663,7 +620,7 @@ vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
     // -------------------------------- //
     // Get the amplitude phase contribution for current butterfly phase.
     // -------------------------------- //
-    t=twiddle[k]*oddF[k];               // Scale and get this freq bin.
+    t=twiddles[k]*oddF[k];               // Scale and get this freq bin.
     // -------------------------------- //
     // Prepare results for next butterfly phase.
     // -------------------------------- //
@@ -678,7 +635,7 @@ vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ IFFT ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // So how do we calculate the Inverse FFT? To get the inverse of a signal X(k)
 // of length k an elegant trick is performed.
-// The IFFT is nothing more than the FFT multiplied by 1/N, and with a twiddle
+// The IFFT is nothing more than the FFT multiplied by 1/N, and with a twiddles
 // factor that rotates clockwise, instead of counter-clockwise.
 // It is nothing more than the conjugate of the FFT multiplied by (1/N).
 //
@@ -695,7 +652,7 @@ vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
 // Note that this algorithm should be slower than the IFFT Stride above, but it 
 // is also clearer.
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>:: IFFT (const vector<complex<T>> &s)
 {
   const int N=s.size();                 // Get the length of the signal.
@@ -712,23 +669,23 @@ vector<complex<T>> SpectralOps<T>:: IFFT (const vector<complex<T>> &s)
     // -------------------------------- //
     // 3. Conjugate and normalize the signal.
     // -------------------------------- //
-  vector<complex<T>> s(N);              // Signal buffer.
+  vector<complex<T>> sig(N);            // Signal buffer.
   for (int i=0;i<N;++i)                 // For all samples in reversed spectrum
-    s[i]=conj(S[i])/static_cast<T>(N);  // Reverse and normalize.
-  return s;                             // Return time-domain signal.  
+    sig[i]=conj(S[i])/static_cast<T>(N);// Reverse and normalize.
+  return sig;                          // Return time-domain signal.  
 } 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Convolution ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // Method to perform the convolution of two signals. Typically in our context
 // the convolution is done between an input signal s(n) of length N  and
 // filter of length N h(n).
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>::Convolution( // Obtain the product of two signals.
     const vector<complex<T>> &s,        // Our input signal.
     const vector<complex<T>> &h)        // Our filter.
 {                                       // ---------- Convolution ----------- //
     const int n = s.size();             // Length of the input signal.
-    const nt m = h.size();              // Length of the filter.
+    const int m = h.size();              // Length of the filter.
     int N = 1;                          // Size of the N-point FFT.
     while (N < n + m - 1)               // While N is less than the convolution
         N <<= 1;                        // Find smallest power of 2 >= n+m-1
@@ -757,7 +714,7 @@ vector<complex<T>> SpectralOps<T>::Convolution( // Obtain the product of two sig
     return y;                           // Return the filtered signal.
 }                                       // ---------- Convolution ----------- //
 // Short-Time Fourier Transform
-template <typename T>
+template<typename T>
 vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s, 
   const WindowType &w, 
   int wSiz, 
@@ -766,7 +723,7 @@ vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s,
   int step = wSiz * (1 - overlap / 100.0);// step size based on the ovlap %
   int nSegs = (s.size() - wSiz + step) / step;// # segs for the signal.
   vector<vector<complex<T>>> sMat(nSegs, vector<complex<T>>(wSiz));
-  vector<T> window = GenerateWindow(windowType, wSiz);// Window to be applied.
+  vector<T> window = this->window->GetWindow();// Window to be applied.
     // -------------------------------- //
     // Process each seg of the signal. Each row of the matrix is a frame of
     // the signal, and every column a frequency bin inside the windowed segment.
@@ -784,11 +741,11 @@ vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s,
     // -------------------------------- //
     // Compute the FFT of the windowed seg and store it in the STFT matrix
     // -------------------------------- //
-      sMat[i] = FFT(seg, windowType);
-  }
+      sMat[i] = FFT(seg);               // Compute the FFT of the windowed segment.
+  }                                     // Done with all segments.            
   return sMat;                          // The windowed spectrum.
 }
-template <typename T>
+template<typename T>
 // Inverse Short-Time-Fourier-Transform Method.
 vector<complex<T>> SpectralOps<T>::ISTFT(
     const vector<vector<complex<T>>> &sMat,// Input STFT matrix
@@ -804,7 +761,7 @@ vector<complex<T>> SpectralOps<T>::ISTFT(
     vector<complex<T>> sig(len,0.0);// Initialize the result signal
     vector<T> nOverlaps(len,0.0); // Initialize the overlap count
     // Generate the window to be applied during the inverse process
-    vector<T> window = GenerateWindow(w, wSiz);
+    vector<T> window = this->window.GenerateWindow(w, wSiz); // Get the window to be applied.
     // -------------------------------- //
     //  Process each seg of the signal. Each row of the matrix is a frame of
     //  of the signal, and each column a frequency bin inside the window.
@@ -844,7 +801,7 @@ vector<complex<T>> SpectralOps<T>::ISTFT(
     return sig;
 }
 // vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap)
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>::OLAProcessor(
     const vector<complex<T>> &s, // The input signal.
     const vector<complex<T>> &h, // The desired FIR filter.
@@ -868,7 +825,7 @@ vector<complex<T>> SpectralOps<T>::OLAProcessor(
     return ISTFT(sig, w, wSiz, ovlap);
 }
 // vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap)
-template <typename T>
+template<typename T>
 vector<complex<T>> SpectralOps<T>::OLAProcessor(
     const vector<complex<T>> &s, // The input signal.
     const WindowType &w,         // The window used.
@@ -877,7 +834,7 @@ vector<complex<T>> SpectralOps<T>::OLAProcessor(
 {
     vector<vector<complex<T>>> sMat = STFT(s, w, wSiz, ovlap);// STFT of input signal.
     vector<complex<T>> H(wSiz,complex<T>(0.0,0.0));// Dummy Impulse filter.
-    vector<complex<T>> H = FFT(h);      // FFT of the FIR filter.
+    H=FFT(H);                           // FFT of the FIR filter.
     const int frames = sMat.size();     // Number of frames in the STFT matrix.
     vector<vector<complex<T>>> sig(frames, vector<complex<T>>(wSiz));
     // -------------------------------- //
@@ -892,23 +849,23 @@ vector<complex<T>> SpectralOps<T>::OLAProcessor(
     return ISTFT(sig, w, wSiz, ovlap);
 }
 // Determine the power sepctral density of a windowed signal using Welch's method.
-template <typename T>
+template<typename T>
 vector<T> SpectralOps<T>::WelchPSD(
  const vector<T> &s,                    // The signal to process.
  const WindowType& w,                   // The window to apply to the signal.
  const int wSiz,                        // The size of the window.
  const float ovlap,                     // Overlap percentage (50% typical)
- const int fftSiz)                      // The size of the FFT.
+ const int fftsiz)                      // The size of the FFT.
 {
     // -------------------------------- //
     // Compute the STFT of the signal.
     // -------------------------------- //
-  vector<vector<complex<T>>> stftMat=STFT(signal,wType,wSiz,ovlap);
+  vector<vector<complex<T>>> stftMat=STFT(s,w,wSiz,ovlap);
     // -------------------------------- //
     // Determine the scale factor of the window.
     // -------------------------------- //
-  vector<T> pxxAvg(N,T(0));             // Initialize PSD Buffer
-  const double winScl=pow(norm(GenerateWindow(w,wSiz),2),2); // Get Scale Factor.
+  vector<T> pxxAvg(length,T(0));             // Initialize PSD Buffer
+  const double winScl=pow(norm(this->window.GenerateWindow(w,wSiz),2),2); // Get Scale Factor.
     // -------------------------------- //
     // Now we accumulate the PSD for each segment in the STFT matrix.
     // -------------------------------- //
@@ -918,7 +875,7 @@ vector<T> SpectralOps<T>::WelchPSD(
     // -------------------------------- //
     // Compute the Power Spectal Density
     // -------------------------------- //
-    for (int j=0;j<fftSiz;++j)          // For every sample to process by the FFT
+    for (int j=0;j<fftsiz;++j)          // For every sample to process by the FFT
       pxxAvg[j]+=norm(fftSegment[j])/winScl;// Accumulate sq. magnitude.
   }                                     // Done accumulating sq.magntiude segments.
     // -------------------------------- //
@@ -929,24 +886,24 @@ vector<T> SpectralOps<T>::WelchPSD(
     // -------------------------------- //
     // and normalize the PSD over 2*pi periodic interval.
     // -------------------------------- //
-  for (int i=0; i<fftSiz;++i)           // For every sample...
+  for (int i=0; i<fftsiz;++i)           // For every sample...
     pxxAvg[i]/=(2*M_PI);                //
     // -------------------------------- //
     // Ensure the total energy of the sigal is conserved in the sprectrm.
     // Parseval's Theorem: SUM[n to N-1] x[n]^2 = (1/N) SUM[n to N-1] X[k]^2
     // -------------------------------- //
   pxxAvg[0]/=2;                         // Avergave freq bin 1 (DC component).
-  for (int i=0;i<fftSiz;++i)            // For ever sample count the energy in
+  for (int i=0;i<fftsiz;++i)            // For ever sample count the energy in
     pxxAvg[i]*=2;                       //  positive and negative halves
     // -------------------------------- //
     // Return the first half of the PSD (our FFT is symmetric) and we already
     // have recollected all the power.
     // -------------------------------- //
-  return vector<T>(pxxAvg.begin(),pxxAvg.being()+fftSiz/2+1);
+  return vector<T>(pxxAvg.begin(),pxxAvg.being()+fftsiz/2+1);
 
 }
-template <typename T>
 // Method to perform a frequency shift of the center frequency by a const amount
+template<typename T>
 vector<complex<T>> SpectralOps<T>::Shift(  // Shift the signal in frequency domain.
   const vector<complex<T>>& s,           // The input signal.
   const double fShift,                  // The amount to shift it by
@@ -962,10 +919,9 @@ vector<complex<T>> SpectralOps<T>::Shift(  // Shift the signal in frequency doma
   }                                     // Done delay shifting the signal.
   return sDelay;
 }                                       // ---------- Shift ----------------- //
-
-template<typename T>
 // Method to perform a carrier sweep with a start and stop frequency about the 
 // center frequency
+template<typename T>
 vector<vector<complex<T>>> SpectralOps<T>::Sweep(
   const vector<complex<T>>&s,           // The input signal
   const double fStart,                  // The Start Frequency.
@@ -1001,12 +957,12 @@ vector<vector<complex<T>>> SpectralOps<T>::Sweep(
     // Perform an FFT on the windowed signal to analyze the energy 
     // of the signal at this frequency offset.
     // -------------------------------- //
-    vector<complex<T>> spectrum=FFT(sWindowed);
+    vector<complex<T>> spectrum=FFT(S);
     // -------------------------------- //
     // Normalize the FFT result by a suitable factor (maybe wSiz?) This should
     // distribute the energy across the window.
     // -------------------------------- //
-    for (size_T i=0;i<spectrum.size();++i)
+    for (size_t i=0;i<spectrum.size();++i)
       spectrum[i]/=static_cast<T>(wSiz);
     // -------------------------------- //
     // Next we recollect the resulting FFT spectrum for this frequency offset,
