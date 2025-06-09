@@ -13,11 +13,10 @@
 #endif
 // Missing Theory
 using namespace std;
-
-template <typename T>
+template<typename T> class SpectralOps;
+template<typename T>
 class Window
 {
- friend class SpectralOps;
 public:
     enum class WindowType
     {
@@ -35,7 +34,6 @@ public:
 
     Window(const int N);
     Window(const WindowType &w, const int N);
-    ~Window(void);
     void SetWindowType(const WindowType &w, const int N);
     vector<T> Hanning(const int N);
     vector<T> Hamming(const int N);
@@ -48,105 +46,62 @@ public:
     vector<T> LowSideLobe(const int N);
     vector<T> Rectangular(const int N);
     ~Window(void);
-    vector<T> GenerateWindow(const WindowType &w, const int N);
+    void GenerateWindow(const WindowType &w, const int N);
     
     // Accessors
-   const inline Window<T> GetWindow (void) const { return window; }
-   const inline int GetWindowSize (void) const { return windowSize; }
-   const inline vector<T> GetDefaultWindow (void) { return Rectangular(windowSize);}  
-   inline void SetWindowSize (const int wSiz) {windowSize=wsiz;}
+   const Window<T> GetWindow (void) const { return window; }
+   const inline int GetWindowsize (void) const { return windowsize; }
+   inline vector<T> GetDefaultWindow (void) { return Rectangular(windowsize);}  
+   inline void SetWindowsize (const int wsiz) {windowsize=wsiz;}
+   inline WindowType GetWindowType (void) const { return window; }
    
 
 private:
-    void SetWindowType (const WindowType& w, const int N);
-    int windowSize;
+    int windowsize;
     WindowType window;
 };
 
 // ------------------------------------ //
 // Constructors and Destructors
 // ------------------------------------ //
-
-template <typename T>
-Window<T>::Window(const int N) : windowSize{N}, window{WindowType::Rectangular} {}
-
-template <typename T>
+template<typename T>
+Window<T>::Window(const int N)
+    : windowsize(N), window(WindowType::Rectangular) {}
+template<typename T>
 Window<T>::Window(const WindowType &w, const int N) 
 {
   SetWindowType(w,N);
 }
 
-
-template <typename T>
-Window<T>::~Window(void) {}
-
 // ------------------------------------ //
 // Accessor Methods
 // ------------------------------------ //
 
-template <typename T>
-const int Window<T>::GetWindowSize(void) const
-{
-    return windowSize;
-}
-
-template <typename T>
-void Window<T>::SetWindowSize(const int N)
-{
-    windowSize = N;
-}
-
-template <typename T>
-vector<T> Window<T>::GetWindowType(void) const
-{
-    return window;
-}
-
-template <typename T>
+template<typename T>
 void Window<T>::SetWindowType(const WindowType &w, const int N)
 {
-    switch (w):
-        {
-        case:
-            WindowType::Hanning : window = Hanning(N);
-            break;
-        case:
-            WindowType::Hamming : window = Hamming(N);
-            break;
-        case:
-            WindowType::BlackmanHarris : window = BlackmanHarris(N);
-        case:
-            WindowType::ExactBlackman : window = ExactBlackman(N);
-            break;
-        case:
-            WindowType::Blackman : window = Blackman(N);
-            break;
-        case:
-            WindowType::FlatTop : window = FlatTop(N);
-            break;
-        case:
-            WindowType::FourTermBHarris : window = FourTermBHarris(N);
-            break;
-        case:
-            WindowType::SevenTermBHarris : window = SevenTermBHarris(N);
-            break;
-        case:
-            WindowType::LowSideLobe : window = LowSideLobe(N);
-            break;
-        case:
-            WindowType::Rectangular : window = Rectangular(N);
-            break;
-        default:
-            window = Rectangular(N);
-            break;
-        }
+   window=w;                            // Store the type
+   windowsize=N;                        // This long.
+}
+template<typename T>
+void Window<T>::GenerateWindow(const WindowType& w, const int N)
+{
+    switch (w)                          // Set windows according to window type.
+    {
+        case WindowType::Hanning:         return Hanning(N);
+        case WindowType::Hamming:         return Hamming(N);
+        case WindowType::BlackmanHarris:  return BlackmanHarris(N);
+        case WindowType::ExactBlackman:   return ExactBlackman(N);
+        case WindowType::Blackman:        return Blackman(N);
+        case WindowType::FlatTop:         return FlatTop(N);
+        case WindowType::FourTermBHarris: return FourTermBHarris(N);
+        case WindowType::SevenTermBHarris:return SevenTermBHarris(N);
+        case WindowType::LowSideLobe:     return LowSideLobe(N);
+        case WindowType::Rectangular:     return Rectangular(N);
+        default:                          return Rectangular(N);
+    }
 }
 
-template <typename T>
-vector<T> Window<T>::GetDefaultWindow(void)
-{
-    return Rectangular(windowSize);
-}
 
 // ------------------------------------ //
 // Window Definition Methods
@@ -155,7 +110,7 @@ vector<T> Window<T>::GetDefaultWindow(void)
 // https://www.ni.com/docs/en-US/bundle/labwindows-cvi/page/advancedanalysisconcepts/lvac_low_sidelobe.html?srsltid=AfmBOoq24bE811jsNCA5Frywall7E4fABxA6kj3FgSxqYY_808W37dA1
 
 // ------------------------------------ //
-template <typename T>
+template<typename T>
 vector<T> Window<T>::Hanning(const int N)
 {
     vector<T> w(N, T(0));
@@ -164,7 +119,7 @@ vector<T> Window<T>::Hanning(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::Hamming(const int N)
 {
     vector<T> w(N, T(0));
@@ -173,7 +128,7 @@ vector<T> Window<T>::Hamming(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::BlackmanHarris(const int N)
 {
     vector<T> w(N, T(0));
@@ -181,16 +136,16 @@ vector<T> Window<T>::BlackmanHarris(const int N)
         w[n] = 0.35875 - 0.48829 * cos(2 * M_PI * n / (N - 1)) + 0.14128 * cos(4 * M_PI * n / (N - 1)) - 0.01168 * cos(6 * M_PI * n / (N - 1));
     return w;
 }
-template <typename T>
+template<typename T>
 vector<T> Window<T>::ExactBlackman(const int N)
 {
     vector<T> w(N, T(0));
     for (int n = 0; n < N; ++n)
-        w[i] = 0.4243800934609435 - 0.4973406350967378 * cos(2 * M_PI * n / (N - 1)) + 0.7827927144231873 * cos(4 * M_PI * n / (N - 1));
+        w[n]= .4243800934609435 - 0.4973406350967378 * cos(2 * M_PI * n / (N - 1)) + 0.7827927144231873 * cos(4 * M_PI * n / (N - 1));
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::Blackman(const int N)
 {
     vector<T> w(N, T(0));
@@ -199,7 +154,7 @@ vector<T> Window<T>::Blackman(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::FlatTop(const int N)
 {
     vector<T> w(N, T(0));
@@ -208,7 +163,7 @@ vector<T> Window<T>::FlatTop(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::FourTermBHarris(const int N)
 {
     vector<T> w(N, T(0));
@@ -219,7 +174,7 @@ vector<T> Window<T>::FourTermBHarris(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::SevenTermBHarris(const int N)
 {
     vector<T> w(N, T(0));
@@ -230,7 +185,7 @@ vector<T> Window<T>::SevenTermBHarris(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::LowSideLobe(const int N)
 {
     vector<T> w(N, T(0));
@@ -241,17 +196,10 @@ vector<T> Window<T>::LowSideLobe(const int N)
     return w;
 }
 
-template <typename T>
+template<typename T>
 vector<T> Window<T>::Rectangular(const int N)
 {
     vector<T> w(N, T(1));
     return w;
-}
-
-template <typename T>
-vector<T> Window<T>::GenerateWindow(const WindowType& w, const int N)
-{
-  SetWindowType(w,N);
-  return window;
 }
 #endif // DSP_WINDOWS_H
