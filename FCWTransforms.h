@@ -8,9 +8,17 @@
 #ifndef SPECTRAL_H
 #define SPECTRAL_H
 
+#include <iostream>
 #include <vector>
+#include <cmath>
+#include <algorithm>
+#include <numeric>
+#include <functional>
 #include <complex>
-#include <math.h>
+#include <thread>
+#include <future>
+#include <chrono>
+#include <stdexcept>
 #include "DSPWindows.h"
 
 
@@ -51,7 +59,7 @@ class WaveletOps
       // -------------------------- //
       // 1. Zero-Pad the signal to make sure the operation is possible.
       // -------------------------- //   
-      auto padded=pad_to_pow(signal);// Zero-pad the signal.
+      auto padded=pad_to_pow2(signal);// Zero-pad the signal.
       // -------------------------- //
       // 2. Now forward DWT + threshold.
       // -------------------------- //
@@ -66,52 +74,6 @@ class WaveletOps
       // ------------------------- //
       return remove_padding(recon,signal.size());
     }                              // ---------- Denoise ----------- 
-private:
-  WaveletType wType{Haar};       // The wavelet of choice.
-  ThresholdType tType{Hard};     // The type of thresholding.
-  size_t levels{1};              // The wavelet decomposition level.
-  double threshold{0.0f};        // The threshold of when to cancel.
-// Method to choose the correct forward wavelet function.
-  std::function<std::pair<std::vector<double>,std::vector<double>>>(const std::vector<double>&)>     
-  selectForward(void) const      // Generate the window we want.
-  {                              // -------- selectForward --------
-    switch (wType)               // Act according to the type.
-    {                            //
-      case WaveletType::Haar: return haar;// We want Haar.
-      case WaveletType::Db1:  return db1;// We want db1.
-      case WaveletType::Db6: return db6;// We want db6.
-      case WaveletType::Sym5: return sym5;// We want sym 5
-      case WaveletType::Sym8: return sym8;// We want sym 8
-      case WaveletType::Coif5: return coif5;// We want sym 5
-    }                           // Done acting according to wlet typ.
-    return haar;                // Return our default wavelet.
-  }                             // -------- selectForward --------
-// Chooses the correct inverse wavelet reconstruction
-  std::function<std::vector<double>(const std::vector<double>&, const std::vector<double>&)>
-  selectInverse(void) const   // Select the correct reconstruct wave.
-  {                           // -------- selectInverse --------
-    switch(wType)             // Act according to the wave type
-    {                         // Select the recon wavelet.
-      case WaveletType::Haar: return inv_haar;// We want Haar.
-      case WaveletType::Db1:  return inv_db1;// We want db1.
-      case WaveletType::Db6: return inv_db6;// We want db6.
-      case WaveletType::Sym5: return inv_sym5;// We want sym 5
-      case WaveletType::Sym8: return inv_sym8;// We want sym 8
-      case WaveletType::Coif5: return inv_coif5;// We want sym 5 
-    }                          // Done acting according to wtype.
-    return inv_harr;           // Return inverse of default fwd wave.
-  }                            // -------- selectInverse --------
-  // Convert enum to the string the denoiser expects.
-  std::string tTypeToString(void) const
-  {
-    return (this->ttype==ThresholdType::Hard?"hard":"soft");
-  }
-protected:
-/// Pad a signal up to the next power of two
-  inline double next_power_of_2(double x) 
-  {
-    return x == 0 ? 1 : pow(2, ceil(log2(x)));
-  }
 public:
   vector<double> pad_to_pow2(const vector<double>& signal) 
   {
@@ -389,7 +351,6 @@ pair<vector<double>, vector<double>> coif5(const vector<double>& signal)
     return make_pair(approx, detail);
 }
                                    
-
 /// Inverse wavelet reconstruction
 vector<double> inverse_haar(const vector<double>& approx, const vector<double>& detail) 
 {
@@ -404,7 +365,25 @@ vector<double> inverse_haar(const vector<double>& approx, const vector<double>& 
 
     return reconstructed_signal;
 }
+vector<double> inverse_db1(const vector<double>& approx, const vector<double>& detail)
+{
+    const vector<double> h_inv = {
+        (1 + sqrt(3)) / 4, (3 + sqrt(3)) / 4, (3 - sqrt(3)) / 4, (1 - sqrt(3)) / 4
+    };
+    const vector<double> g_inv = { h_inv[3], -h_inv[2], h_inv[1], -h_inv[0] };
 
+    vector<double> reconstructed_signal(2 * approx.size(), 0.0);
+    for (size_t i = 0; i < approx.size(); ++i) {
+        for (size_t k = 0; k < h_inv.size(); ++k) {
+            size_t index = (2 * i + k - h_inv.size() / 2 + 1);
+            if (index < reconstructed_signal.size()) {
+                reconstructed_signal[index] += approx[i] * h_inv[k] + detail[i] * g_inv[k];
+            }
+        }
+    }
+
+    return reconstructed_signal;
+}
 vector<double> inverse_db6(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = {
@@ -530,7 +509,51 @@ vector<double> soft_threshold(const vector<double>& detail, double threshold)
     return result;
 }  
   
-
+private:
+  WaveletType wType{WaveletType::Haar};       // The wavelet of choice.
+  ThresholdType tType{ThresholdType::Hard};     // The type of thresholding.
+  size_t levels{1};              // The wavelet decomposition level.
+  double threshold{0.0f};        // The threshold of when to cancel.
+// Method to choose the correct forward wavelet function.
+std::function<std::pair<std::vector<double>, std::vector<double>>(const std::vector<double>&)> selectForward(void) const
+  {                              // -------- selectForward --------
+    switch (wType)               // Act according to the type.
+    {                            //
+      case WaveletType::Haar: return haar;// We want Haar.
+      case WaveletType::Db1:  return db1;// We want db1.
+      case WaveletType::Db6: return db6;// We want db6.
+      case WaveletType::Sym5: return sym5;// We want sym 5
+      case WaveletType::Sym8: return sym8;// We want sym 8
+      case WaveletType::Coif5: return coif5;// We want sym 5
+    }                           // Done acting according to wlet typ.
+    return haar;                // Return our default wavelet.
+  }                             // -------- selectForward --------
+// Chooses the correct inverse wavelet reconstruction
+  std::function<std::vector<double>(const std::vector<double>&, const std::vector<double>&)>
+  selectInverse(void) const   // Select the correct reconstruct wave.
+  {                           // -------- selectInverse --------
+    switch(wType)             // Act according to the wave type
+    {                         // Select the recon wavelet.
+      case WaveletType::Haar: return inverse_haar;// We want Haar.
+      case WaveletType::Db1:  return inverse_db1;// We want db1.
+      case WaveletType::Db6: return inverse_db6;// We want db6.
+      case WaveletType::Sym5: return inverse_sym5;// We want sym 5
+      case WaveletType::Sym8: return inverse_sym8;// We want sym 8
+      case WaveletType::Coif5: return inverse_coif5;// We want sym 5 
+    }                          // Done acting according to wtype.
+    return inverse_haar;       // Return inverse of default fwd wave.
+  }                            // -------- selectInverse --------
+  // Convert enum to the string the denoiser expects.
+  std::string tTypeToString(void) const
+  {
+    return (this->tType==ThresholdType::Hard?"hard":"soft");
+  }
+protected:
+/// Pad a signal up to the next power of two
+  inline double next_power_of_2(double x) 
+  {
+    return x == 0 ? 1 : pow(2, ceil(log2(x)));
+  }
   
 };
 
@@ -602,8 +625,8 @@ private:
     const int windowSize;                    // The size of the window.
     const float overlap;                     // The overlap factor.
     vector<complex<T>> twiddles;             // Precomputed twiddles factors.
-    const double sRate;                      // The rate at which we sampled the RF.
-    const int length;                        // The length of the signal.
+    double sRate;                      // The rate at which we sampled the RF.
+    int length;                        // The length of the signal.
 };
 
 // ------------------------------------ //
