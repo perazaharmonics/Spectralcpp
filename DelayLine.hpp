@@ -7,7 +7,7 @@
  * * It is used to delay the audio signal by a specified number of samples.
  * * Maxelen is the compile time length in sampples of the delay line.
  * Author:
- * JEP J. Enrique Peraza
+ * JEP J. Enrique Peraza, P&G Labs, LLC
  *
  */
 #pragma once
@@ -24,6 +24,9 @@ namespace dsp
 class DelayLine
 {
     public:
+        // Get DelayLine size in samples.
+        inline size_t GetDelay(void) const noexcept { return this->delay; } // Get the current delay in samples.
+    
         // Set integer delay (1 <=d <=maxlen-1)
         bool SetDelay(                    // Set the value of the delay line.
             std::size_t d)                  // The delay in samples.
