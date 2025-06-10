@@ -6,7 +6,7 @@
  * * It includes a helper factory to create specific filter types.
  * *
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
