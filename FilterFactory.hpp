@@ -6,7 +6,7 @@
  * * OnePole, ADSR or BiQuad type.
  * *
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
@@ -44,14 +44,14 @@ namespace dsp
     static OnePole<T> OnePoleLP(double fs,double fc)
     {                                   // ------- OnePoleLP --------- //
        OnePole<T> h;                    // Create a OnePole filter object.
-       h.SetConf(dsp::OnePole<T>::Conf::LowPass);// Configure filter topology as LP.
+       h.SetConf(dsp::OnePole<T>::Conf::Lowpass);// Configure filter topology as LP.
        h.Prepare(fs,fc);                // Prepare the filter with the sample rate and cutoff frequency.
        return h;                        // Return the filter object.
     }                                   // ------- OnePoleLP --------- //
     static OnePole<T> OnePoleHP(double fs,double fc)
     {                                   // ------- OnePoleHP --------- //
        OnePole<T> h;                    // Create a OnePole filter object.
-       h.SetConf(dsp::OnePole<T>::Conf::HighPass);// Configure filter topology as HP.
+       h.SetConf(dsp::OnePole<T>::Conf::Highpass);// Configure filter topology as HP.
        h.Prepare(fs,fc);                // Prepare the filter with the sample rate and cutoff frequency.
        return h;                        // Return the filter object.
     }                                   // ------- OnePoleHP --------- //
