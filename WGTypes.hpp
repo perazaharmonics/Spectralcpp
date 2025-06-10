@@ -3,7 +3,7 @@
  * * pgsynth project.
  * *
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
@@ -13,11 +13,13 @@
 
 namespace dsp::wg
 {
-
-using Sample=float;
+template<typename T>
+using Sample=T;
 
 // Forward references for visitor pattern
+template<size_t MaxLen>
 struct DelayBranch;
+template<size_t N>
 struct ScatteringJunction;
 
 // A generic processing node
