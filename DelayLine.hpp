@@ -7,7 +7,7 @@
  * * It is used to delay the audio signal by a specified number of samples.
  * * Maxelen is the compile time length in sampples of the delay line.
  * Author:
- * JEP J. Enrique Peraza, P&G Labs, LLC
+ * JEP J. Enrique Peraza
  *
  */
 #pragma once
