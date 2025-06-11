@@ -1,5 +1,5 @@
  /* 
- * * P&G Labs, LLC
+ * * 
  * *
  * * Filename: CylindricalBore.hpp
  * * Description:
@@ -7,7 +7,7 @@
  * * in a waveguide network.
  * * It is used to model the acoustic properties of a cylindrical bore in a waveguide.
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
