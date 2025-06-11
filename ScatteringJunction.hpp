@@ -1,5 +1,5 @@
  /* 
- * * P&G Labs, LLC
+ * * 
  * *
  * * Filename: ScatteringJunction.hpp
  * * Description:
@@ -9,7 +9,7 @@
  * * or lossy, depending on the configuration. These are 2D  3-port T junctions
  * * or 4-port cross junsctions. Although its templated for N ports,
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
