@@ -1,12 +1,12 @@
  /* 
- * * P&G Labs, LLC
+ * * 
  * *
  * * Filename: StringElement.hpp
  * * Description:
  * * This file contains a StringElement class that represent an ideal
  * * or damped string element in a waveguide network.
  * * Author:
- * * JEP J. Enrique Peraza, P&G Labs, LLC
+ * * JEP J. Enrique Peraza
  * *
  */
 #pragma once
