@@ -16,23 +16,33 @@
 namespace dsp::wg
 {
   template<size_t MaxLen = 1 << 15>
-  struct DelayBranch final:Node
+  struct DelayBranch final:public Node
   {
-    explicit DelayBranch(size_t len=1) { if (len<(MaxLen);this->SetDelay(len)); else this->SetDelay(MaxLen); } // Constructor with optional length.
+    DelayBranch(void) noexcept=default;
     bool SetDelay(size_t d) noexcept { return (this->dl.SetDelay(d)); }
-    inline wg::Sample<float> Read(void) const noexcept { return this->dl.Read(); }
+    float Read(void) const noexcept { return this->dl.Read(); }
+    // Write a sample to tail of the delay line:
     inline void Write(wg::Sample<float> s) noexcept { this->dl.Write(s); }
-    // No internal state evolution except sample propagation:
+    // Propagate the delay line by 'n' samples.
+    // repeatedly read the head and write it back to the tail.
     void Propagate(size_t n) noexcept override
     {                                   // ----------- Propagate ----------- //
-        while (n--)                     // Until out of samples....
-          this->dl.Write(this->dl.Read());// Propagate the sample across the line.
+        for (size_t i=0;i<n;++i)        // For each sample to propagate...
+        {
+          //this->dl.Write(this->dl.Read());// Propagate the sample across the line.
+          float s=this->dl.Read(); // Read the sample from the delay line.
+          this->dl.Write(s);       // Write the sample back to the delay line.
+        }  
     }                                   // ----------- Propagate ----------- //
     inline size_t GetDelay(void) const noexcept { return this->dl.GetDelay(); }
     inline size_t GetMaxLen(void) const noexcept { return MaxLen; }
+    float Peek(void) const noexcept
+    {
+      return this->dl.PeekTail(); // Read the sample at the head of the delay line without advancing it.
+    }
     private:
       dsp::DelayLine<wg::Sample<float>,MaxLen> dl;// The delay line object.
-      static_assert(MaxLen > 0 && (MaxLen & (MaxLen - 1)) == 0, "MaxLen must be a power of two for efficient wrap-around.");
-      double len{MaxLen};             // The length of the delay line in samples.
+      //static_assert(MaxLen > 0 && (MaxLen & (MaxLen - 1)) == 0, "MaxLen must be a power of two for efficient wrap-around.");
+      //double len{MaxLen};             // The length of the delay line in samples.
    };
 } // namespace dsp::wg
