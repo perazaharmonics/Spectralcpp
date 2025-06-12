@@ -11,6 +11,7 @@
 #include <array>
 #include <cstddef>
 #include <cassert>
+#include <cmath>
 
 namespace dsp
 {
@@ -22,7 +23,7 @@ class VarFracDelay {
   static_assert((MaxLen & (MaxLen-1))==0, "MaxLen must be power of two");
 
 public:
-  VarFracDelay() { Clear(); }
+  VarFracDelay(void) { Clear(); }
 
   /// Set the starting (integer) delay
   /// Must be <= MaxLen-1
@@ -45,7 +46,7 @@ public:
   {
     // integer & fractional parts of the delay
     float d=delay;
-    size_t i0=wid  1;             // last‐written sample
+    size_t i0=widx;             // last‐written sample
     // -------------------------- //
     // wrap i0
     // -------------------------- //
@@ -58,7 +59,7 @@ public:
 
   /// Slide the delay line from its current value
   /// to newDelay over nFrames calls to Tick().
-  void RampTo(float newDelay, stdsize_t nFrames) noexcept 
+  void RampTo(float newDelay, size_t nFrames) noexcept 
   {
     target=newDelay;
     incr=(target-delay)/float(nFrames);
