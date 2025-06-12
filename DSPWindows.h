@@ -47,7 +47,12 @@ public:
     vector<T> Rectangular(const int N);
     ~Window(void);
     void GenerateWindow(const WindowType &w, const int N);
-    
+    overload operator[](const int idx) const
+    {
+        if (idx < 0 || idx >= windowsize)
+            throw out_of_range("Index out of range in Window<T>::operator[]");
+        return GenerateWindow(window, windowsize)[idx];
+    }
     // Accessors
    const Window<T> GetWindow (void) const { return window; }
    const inline int GetWindowsize (void) const { return windowsize; }
