@@ -595,7 +595,8 @@ public:
     vector<complex<T>> ISTFT(const vector<vector<complex<T>>> &sMat, const WindowType &w, const int wSiz, const float ovlap);
   // Spectral Computation Methods 
    
-    vector<complex<T>> Convolution(const vector<complex<T>> &s, const vector<complex<T>> &h);        
+    vector<complex<T>> Convolution(const vector<complex<T>> &s, const vector<complex<T>> &h);
+    vector<complex<T>> PointwiseMul(const std::vector<std::complex<T>>& A,const std::vector<std::complex<T>>& B) const;        
     vector<complex<T>> OLAProcessor(const vector<complex<T>> &s,const WindowType &w, const int wSiz, const float ovlap);
     vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap);
     vector<complex<T>> Shift(const vector<complex<T>>& s, const double fShift, const double fs);
@@ -1239,6 +1240,18 @@ vector<complex<T>> SpectralOps<T>::Convolution( // Obtain the product of two sig
     y.resize(n + m - 1);                // Truncate to the original size.
     return y;                           // Return the filtered signal.
 }                                       // ---------- Convolution ----------- //
+
+// Multiply two-length-N spectra element by element.
+template<typename T>
+vector<complex<T>> SpectralOps<T>::PointwiseMul(const std::vector<std::complex<T>>& A,const std::vector<std::complex<T>>& B) const
+{                                       // ---------- PointwiseMul ----------- //
+  assert(A.size()==B.size());           // Ensure both spectra are of the same length.
+  std::vector<std::complex<T>> C(A.size()); // Create a vector to hold the result.
+  for (size_t i=0;i<A.size();++i)       // For each spectral element...
+    C[i]=A[i]*B[i];                     // Multiply the two spectra element by element.
+  return C;                             // Return the resulting spectrum.
+}                                       // ---------- PointwiseMul ----------- //
+
 // Short-Time Fourier Transform
 template<typename T>
 vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s, 
@@ -1504,3 +1517,4 @@ vector<vector<complex<T>>> SpectralOps<T>::Sweep(
   return sMat;
 } 
 #endif // SPECTRALOPS_H
+
