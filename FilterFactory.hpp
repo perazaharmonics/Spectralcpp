@@ -62,7 +62,7 @@ namespace dsp
       h.SetTaps(dsp::ButterworthLP(fs,fc,Q));// Set the filter taps.
       return h;                          // Return the filter object.
     }                                    // ------- ButterworthLP --------- //
-    static dsp::BiQuad<T> ButterworthHP(double fs,double fc,double Q)
+    static dsp::BiQuad<T> ButterWorthHP(double fs,double fc,double Q)
     {                                    // ------- ButterworthHP --------- //
       dsp::BiQuad<T> h;                       // Create a BiQuad filter object.
       h.SetTaps(dsp::ButterworthHP(fs,fc,Q));// Set the filter taps.
