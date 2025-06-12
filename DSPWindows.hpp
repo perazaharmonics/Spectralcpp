@@ -1,5 +1,4 @@
-#ifndef DSP_WINDOWS_H
-#define DSP_WINDOWS_H
+#pragma once
 
 #include <vector>
 #include <complex>
@@ -8,9 +7,8 @@
 #include <valarray>
 #include <cstdint>
 
-#ifndef M_PI
-#define M_PI 3.1415926535897932384626433832795029
-#endif
+namespace dsp::spectral
+{
 // Missing Theory
 using namespace std;
 template<typename T> class SpectralOps;
@@ -47,24 +45,23 @@ public:
     vector<T> LowSideLobe(const int N);
     vector<T> Rectangular(const int N);
     ~Window(void);
-    void GenerateWindow(const WindowType &w, const int N);
-    size_t operator[](const size_t idx) const
+    vector<T> GenerateWindow(const WindowType &w, const int N);
+    // Access the elements of the window using the [] operator.
+    T operator[](const size_t idx) const
     {
-        if (idx < 0 || idx >= static_cast<size_t>(windowsize))
-            throw out_of_range("Index out of range in Window<T>::operator[]");
-        return GenerateWindow(window, windowsize)[idx];
+        return data[idx]; // Return the element at index idx.
     }
     // Accessors
    const Window<T> GetWindow (void) const { return window; }
    const inline int GetWindowsize (void) const { return windowsize; }
    inline vector<T> GetDefaultWindow (void) { return Rectangular(windowsize);}  
    inline void SetWindowsize (const int wsiz) {windowsize=wsiz;}
-   inline WindowType GetWindowType (void) const { return window; }
-   
+   inline WindowType GetWindowType (void) const { return window; }   
 
 private:
     int windowsize;
     WindowType window;
+    vector<T> data;
 };
 
 // ------------------------------------ //
@@ -88,25 +85,26 @@ void Window<T>::SetWindowType(const WindowType &w, const int N)
 {
    window=w;                            // Store the type
    windowsize=N;                        // This long.
-   GenerateWindow(w,N);                 // Regenerate the window.
+   GenerateWindow(w, N);               // Generate the window.
 }
 template<typename T>
-void Window<T>::GenerateWindow(const WindowType& w, const int N)
+vector<T> Window<T>::GenerateWindow(const WindowType& w, const int N)
 {
     switch (w)                          // Set windows according to window type.
     {
-        case WindowType::Hanning:         return Hanning(N);
-        case WindowType::Hamming:         return Hamming(N);
-        case WindowType::BlackmanHarris:  return BlackmanHarris(N);
-        case WindowType::ExactBlackman:   return ExactBlackman(N);
-        case WindowType::Blackman:        return Blackman(N);
-        case WindowType::FlatTop:         return FlatTop(N);
-        case WindowType::FourTermBHarris: return FourTermBHarris(N);
-        case WindowType::SevenTermBHarris:return SevenTermBHarris(N);
-        case WindowType::LowSideLobe:     return LowSideLobe(N);
-        case WindowType::Rectangular:     return Rectangular(N);
-        default:                          return Rectangular(N);
+        case WindowType::Hanning:         data=Hanning(N);
+        case WindowType::Hamming:         data=Hamming(N);
+        case WindowType::BlackmanHarris:  data=BlackmanHarris(N);
+        case WindowType::ExactBlackman:   data=ExactBlackman(N);
+        case WindowType::Blackman:        data=Blackman(N);
+        case WindowType::FlatTop:         data=FlatTop(N);
+        case WindowType::FourTermBHarris: data=FourTermBHarris(N);
+        case WindowType::SevenTermBHarris:data=SevenTermBHarris(N);
+        case WindowType::LowSideLobe:     data=LowSideLobe(N);
+        case WindowType::Rectangular:     data=Rectangular(N);
+        default:                          data=Rectangular(N);
     }
+    return data;                          // Return the generated window data.
 }
 
 
@@ -208,5 +206,5 @@ vector<T> Window<T>::Rectangular(const int N)
 {
     vector<T> w(N, T(1));
     return w;
+} 
 }
-#endif // DSP_WINDOWS_H
