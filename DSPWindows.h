@@ -32,6 +32,7 @@ public:
         Rectangular
     };
 
+    Window(void)=default;
     Window(const int N);
     Window(const WindowType &w, const int N);
     void SetWindowType(const WindowType &w, const int N);
