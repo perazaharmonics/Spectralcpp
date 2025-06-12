@@ -87,6 +87,7 @@ void Window<T>::SetWindowType(const WindowType &w, const int N)
 {
    window=w;                            // Store the type
    windowsize=N;                        // This long.
+   GenerateWindow(w,N);                 // Regenerate the window.
 }
 template<typename T>
 void Window<T>::GenerateWindow(const WindowType& w, const int N)
