@@ -5,8 +5,7 @@
 // Author: J. Enrique Peraza, JEP
 // =======================================================================================
 
-#ifndef SPECTRAL_H
-#define SPECTRAL_H
+#pragma once
 
 #include <iostream>
 #include <vector>
@@ -21,8 +20,9 @@
 #include <stdexcept>
 #include "DSPWindows.h"
 
-
-using namespace std;
+namespace dsp::spectral
+{
+  using namespace std;
  
 // Class template for spectral operations
 template<typename T>
@@ -75,7 +75,7 @@ class WaveletOps
       return remove_padding(recon,signal.size());
     }                              // ---------- Denoise ----------- 
 public:
-  vector<double> pad_to_pow2(const vector<double>& signal) 
+  inline vector<double> pad_to_pow2(const vector<double>& signal) 
   {
     size_t original_length = signal.size();
     size_t padded_length = static_cast<size_t>(next_power_of_2(original_length));
@@ -87,13 +87,13 @@ public:
     return padded_signal;
   }                                                     
 /// Remove padding back to the original length
-  vector<double> remove_padding(const vector<double>& signal, size_t original_length) 
+  inline vector<double> remove_padding(const vector<double>& signal, size_t original_length) 
   {
     return vector<double>(signal.begin(), signal.begin() + original_length);
   }
   
 // Normalization.
-vector<double> normalize_minmax(const vector<double>& data) 
+inline vector<double> normalize_minmax(const vector<double>& data) 
 {
     double min_val = *min_element(data.begin(), data.end());
     double max_val = *max_element(data.begin(), data.end());
@@ -105,7 +105,7 @@ vector<double> normalize_minmax(const vector<double>& data)
     return normalized_data;
 }
 
-vector<double> normalize_zscore(const vector<double>& data) 
+inline vector<double> normalize_zscore(const vector<double>& data) 
 {
     double mean_val = accumulate(data.begin(), data.end(), 0.0) / data.size();
     double sq_sum = inner_product(data.begin(), data.end(), data.begin(), 0.0);
@@ -118,7 +118,7 @@ vector<double> normalize_zscore(const vector<double>& data)
     return normalized_data;
 }
 
-vector<double> awgn(const vector<double>& signal, double desired_snr_db) 
+inline vector<double> awgn(const vector<double>& signal, double desired_snr_db) 
 {
     double signal_power = accumulate(signal.begin(), signal.end(), 0.0,
         [](double sum, double val) { return sum + val * val; }) / signal.size();
@@ -135,7 +135,7 @@ vector<double> awgn(const vector<double>& signal, double desired_snr_db)
     return noisy_signal;
 }
 /// Multi‐level discrete wavelet transform with hard/soft thresholding
-  vector<pair<vector<double>, vector<double>>> 
+inline vector<pair<vector<double>, vector<double>>> 
   dwt_multilevel(vector<double>& signal, 
     function<pair<vector<double>, vector<double>>(const vector<double>&)> wavelet_func, 
     size_t levels, double threshold, const string& threshold_type = "hard") 
@@ -164,7 +164,7 @@ vector<double> awgn(const vector<double>& signal, double desired_snr_db)
     return coeffs;
 }                                                                                                                         
 /// Inverse multi‐level DWT
-vector<double> 
+inline vector<double> 
 idwt_multilevel(vector<pair<vector<double>, vector<double>>>& coeffs, function<vector<double>(const vector<double>&, const vector<double>&)> wavelet_func) 
 {                                   // ------- idwt_multilevel ----
     vector<double> signal = coeffs[0].first;
@@ -180,7 +180,7 @@ idwt_multilevel(vector<pair<vector<double>, vector<double>>>& coeffs, function<v
 // Normalization algorithms.
 
 /// Forward wavelet bases
-pair<vector<double>, vector<double>> haar(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> haar(const vector<double>& signal) 
 {
     const vector<double> h = { 1 / sqrt(2), 1 / sqrt(2) };
     const vector<double> g = { 1 / sqrt(2), -1 / sqrt(2) };
@@ -195,7 +195,7 @@ pair<vector<double>, vector<double>> haar(const vector<double>& signal)
 
     return make_pair(approx, detail);
 }                                     
-pair<vector<double>, vector<double>> db1(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> db1(const vector<double>& signal) 
 {
     const vector<double> h = {
         (1 + sqrt(3)) / 4, (3 + sqrt(3)) / 4, (3 - sqrt(3)) / 4, (1 - sqrt(3)) / 4
@@ -220,7 +220,7 @@ pair<vector<double>, vector<double>> db1(const vector<double>& signal)
 
     return make_pair(approx, detail);
 }                                     
-pair<vector<double>, vector<double>> db6(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> db6(const vector<double>& signal) 
 {
     const vector<double> h = {
         -0.001077301085308,
@@ -257,7 +257,7 @@ pair<vector<double>, vector<double>> db6(const vector<double>& signal)
 
     return make_pair(approx, detail);
 }                                     
-pair<vector<double>, vector<double>> sym5(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> sym5(const vector<double>& signal) 
 {
     const vector<double> h = {
         0.027333068345078, 0.029519490925774, -0.039134249302383,
@@ -287,7 +287,7 @@ pair<vector<double>, vector<double>> sym5(const vector<double>& signal)
     return make_pair(approx, detail);
 }
                                     
-pair<vector<double>, vector<double>> sym8(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> sym8(const vector<double>& signal) 
 {
     const vector<double> h = {
         -0.003382415951359, -0.000542132331635, 0.031695087811492,
@@ -320,7 +320,7 @@ pair<vector<double>, vector<double>> sym8(const vector<double>& signal)
     return make_pair(approx, detail);
 }
 
-pair<vector<double>, vector<double>> coif5(const vector<double>& signal) 
+inline pair<vector<double>, vector<double>> coif5(const vector<double>& signal) 
 {
     const vector<double> h = {
         -0.000720549445364, -0.001823208870703, 0.005611434819394,
@@ -352,7 +352,7 @@ pair<vector<double>, vector<double>> coif5(const vector<double>& signal)
 }
                                    
 /// Inverse wavelet reconstruction
-vector<double> inverse_haar(const vector<double>& approx, const vector<double>& detail) 
+inline vector<double> inverse_haar(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = { 0.7071067811865476, 0.7071067811865476 };
     const vector<double> g_inv = { -0.7071067811865476, 0.7071067811865476 };
@@ -365,7 +365,7 @@ vector<double> inverse_haar(const vector<double>& approx, const vector<double>& 
 
     return reconstructed_signal;
 }
-vector<double> inverse_db1(const vector<double>& approx, const vector<double>& detail)
+inline vector<double> inverse_db1(const vector<double>& approx, const vector<double>& detail)
 {
     const vector<double> h_inv = {
         (1 + sqrt(3)) / 4, (3 + sqrt(3)) / 4, (3 - sqrt(3)) / 4, (1 - sqrt(3)) / 4
@@ -384,7 +384,7 @@ vector<double> inverse_db1(const vector<double>& approx, const vector<double>& d
 
     return reconstructed_signal;
 }
-vector<double> inverse_db6(const vector<double>& approx, const vector<double>& detail) 
+inline vector<double> inverse_db6(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = {
         0.111540743350109, 0.494623890398453, 0.751133908021095,
@@ -410,7 +410,7 @@ vector<double> inverse_db6(const vector<double>& approx, const vector<double>& d
     return reconstructed_signal;
 }
 
-vector<double> inverse_sym5(const vector<double>& approx, const vector<double>& detail) 
+inline vector<double> inverse_sym5(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = {
         0.019538882735287, -0.021101834024759, -0.175328089908450,
@@ -436,7 +436,7 @@ vector<double> inverse_sym5(const vector<double>& approx, const vector<double>& 
     return reconstructed_signal;
 }
 
-vector<double> inverse_sym8(const vector<double>& approx, const vector<double>& detail) 
+inline vector<double> inverse_sym8(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = {
         0.001889950332900, -0.000302920514551, -0.014952258336792,
@@ -465,7 +465,7 @@ vector<double> inverse_sym8(const vector<double>& approx, const vector<double>& 
     return reconstructed_signal;
 }
 
-vector<double> inverse_coif5(const vector<double>& approx, const vector<double>& detail) 
+inline vector<double> inverse_coif5(const vector<double>& approx, const vector<double>& detail) 
 {
     const vector<double> h_inv = {
         0.016387336463522, -0.041464936781959, -0.067372554721963,
@@ -491,7 +491,7 @@ vector<double> inverse_coif5(const vector<double>& approx, const vector<double>&
     return reconstructed_signal;
 }
 
-vector<double> hard_threshold(const vector<double>& detail, double threshold) 
+inline vector<double> hard_threshold(const vector<double>& detail, double threshold) 
 {
     vector<double> result(detail.size());
     transform(detail.begin(), detail.end(), result.begin(), [threshold](double coeff) {
@@ -500,7 +500,7 @@ vector<double> hard_threshold(const vector<double>& detail, double threshold)
     return result;
 }
 
-vector<double> soft_threshold(const vector<double>& detail, double threshold) 
+inline vector<double> soft_threshold(const vector<double>& detail, double threshold) 
 {
     vector<double> result(detail.size());
     transform(detail.begin(), detail.end(), result.begin(), [threshold](double coeff) {
@@ -515,7 +515,7 @@ private:
   size_t levels{1};              // The wavelet decomposition level.
   double threshold{0.0f};        // The threshold of when to cancel.
 // Method to choose the correct forward wavelet function.
-std::function<std::pair<std::vector<double>, std::vector<double>>(const std::vector<double>&)> selectForward(void) const
+inline std::function<std::pair<std::vector<double>, std::vector<double>>(const std::vector<double>&)> selectForward(void) const
   {                              // -------- selectForward --------
     switch (wType)               // Act according to the type.
     {                            //
@@ -529,7 +529,7 @@ std::function<std::pair<std::vector<double>, std::vector<double>>(const std::vec
     return haar;                // Return our default wavelet.
   }                             // -------- selectForward --------
 // Chooses the correct inverse wavelet reconstruction
-  std::function<std::vector<double>(const std::vector<double>&, const std::vector<double>&)>
+  inline std::function<std::vector<double>(const std::vector<double>&, const std::vector<double>&)>
   selectInverse(void) const   // Select the correct reconstruct wave.
   {                           // -------- selectInverse --------
     switch(wType)             // Act according to the wave type
@@ -544,7 +544,7 @@ std::function<std::pair<std::vector<double>, std::vector<double>>(const std::vec
     return inverse_haar;       // Return inverse of default fwd wave.
   }                            // -------- selectInverse --------
   // Convert enum to the string the denoiser expects.
-  std::string tTypeToString(void) const
+  inline std::string tTypeToString(void) const
   {
     return (this->tType==ThresholdType::Hard?"hard":"soft");
   }
@@ -563,12 +563,7 @@ class SpectralOps
     using WindowType = typename Window<T>::WindowType; // Alias for WindowType
 public:
     // Constructors
-    SpectralOps(void);
-    SpectralOps(const vector<T> &s);
-    SpectralOps(const vector<T> &s, const double fs, const int len);
-    SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize);
-    SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize, const int overlap);
-    ~SpectralOps(void);
+
 
     // Accessors
     const inline vector<T> GetSignal (void) const { return signal; }
@@ -581,75 +576,38 @@ public:
     inline void SetSubCarrier(const vector<complex<T>> &s) { subCarrier = s; }
     const inline vector<complex<T>> GetSubCarrier (void) { return subCarrier; } 
     
-
-   
-    
-    // Spectral Transformation methods.
-
-    vector<complex<T>> FFTStride(const vector<complex<T>> &s);
-    std::pair<vector<complex<T>>,vector<vector<complex<T>>>> FFTStrideEig(const vector<complex<T>> &s);
-    vector<complex<T>> IFFTStride(const vector<complex<T>> &s);
-    vector<complex<T>> FFT(const vector<complex<T>>& s);
-    vector<complex<T>> IFFT(const vector<complex<T>>& s);
-    vector<vector<complex<T>>> STFT(const vector<complex<T>> &s, const WindowType &w, const int wSiz, const float ovlap);
-    vector<complex<T>> ISTFT(const vector<vector<complex<T>>> &sMat, const WindowType &w, const int wSiz, const float ovlap);
-  // Spectral Computation Methods 
-   
-    vector<complex<T>> Convolution(const vector<complex<T>> &s, const vector<complex<T>> &h);
-    vector<complex<T>> PointwiseMul(const std::vector<std::complex<T>>& A,const std::vector<std::complex<T>>& B) const;        
-    vector<complex<T>> OLAProcessor(const vector<complex<T>> &s,const WindowType &w, const int wSiz, const float ovlap);
-    vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap);
-    vector<complex<T>> Shift(const vector<complex<T>>& s, const double fShift, const double fs);
-    vector<vector<complex<T>>> Sweep (const vector<complex<T>>&s,const double fStart,const double fCenter,const double fStop,const double step,const double fs,const WindowType &w,const int wSiz,const float ovlap);
-    // PSD should only be real to prevent aliasing and double.
-    std::pair<std::vector<T>, T>LevinsonDurbin(const std::vector<T>& r, int order) const;
-    std::vector<std::complex<T>> AR_PSD(const std::vector<T>& r, int order, int fftsize) const;
-    vector<T> WelchPSD (const vector<T> &s, const WindowType& w, const int wSiz, const float ovlap, const int fftSiz);
-
-    protected:
-  // Helper Methods
-    int UpperLog2(const int N);
-    void ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &twiddles, const int rot, const int nBits);
-    void BitReversal(vector<T> &s, const int nBits);
-    vector<T> ZeroPad(const vector<T> &s);
-    vector<T> Upsample(const vector<T> &s, const int factor);
-    vector<T> Downsample(const vector<T> &s, const int factor);
-    vector<T> SetRBW(double rbw,double fs);
-    vector<int> ToInt(const vector<complex<T>> &s);
-    vector<double> ToReal (const vector<complex<T>> &s);    
-
-private:
-    vector<complex<T>> TwiddleFactor(int N); // Precompute the twiddles for the FFT.
-    vector<T> signal;                        // The signal to process.
-    vector<T> subCarrier;                    // 
-    WindowType window;                       // The window to apply to the signal.
-    const int windowSize;                    // The size of the window.
-    const float overlap;                     // The overlap factor.
-    vector<complex<T>> twiddles;             // Precomputed twiddles factors.
-    double sRate;                      // The rate at which we sampled the RF.
-    int length;                        // The length of the signal.
-};
-
 // ------------------------------------ //
 // Constructors and Destructors
 // ------------------------------------ //
 
-template<typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{0.5}
+SpectralOps(void)
+{
+  this->length = 0; // Set the length to 0.
+  this->sRate = 0.0; // Set the sample rate to 0.
+  this->window = WindowType::Hanning; // Default window type is Hamming.
+  this->windowSize = 1024; // Default window size is 1024.
+  this->overlap = 0.5; // Default overlap is 50%.
+  this->signal.clear(); // Clear the signal vector.
+  this->twiddles.clear(); // Clear the twiddles vector.
+  this->subCarrier.clear(); // Clear the subcarrier vector.
+
+}
+
+SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{0.5}
 {
     // Generate the appropriate window for the given window size
     this->window = w.SetWindowType(window, windowSize);
 }
 
-template<typename T>
-SpectralOps<T>::SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize, const int overlap) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{overlap}
+
+SpectralOps(const vector<T> &s, const WindowType &w, const int windowSize, const float overlap) : signal{s}, length{0}, sRate{0.0}, window{w}, windowSize{windowSize}, overlap{overlap}
 {
     // Generate the appropriate window for the given window size
     this->window=w.SetWindowType(window, windowSize);
 }
 
-template<typename T>
-SpectralOps<T>::~SpectralOps(void)
+
+~SpectralOps(void)
 {
     signal.clear();
     twiddles.clear();
@@ -659,8 +617,8 @@ SpectralOps<T>::~SpectralOps(void)
 // ======================== Utility Methods ================================= //
 // Utility Methods to precompute operations needed for Spectral Manipulations.
 // ========================================================================== //
-template<typename T>
-vector<complex<T>> SpectralOps<T>::TwiddleFactor(int N)
+
+inline vector<complex<T>> TwiddleFactor(int N)
 {
     if (twiddles.size() != N / 2)                        // Did we precompute N/2 twiddles before?
     {                                                    // No, so we..
@@ -673,8 +631,8 @@ vector<complex<T>> SpectralOps<T>::TwiddleFactor(int N)
 // Get the smallest power of 2 that is greater than or equal to N
 // that can hold the input sequence for the Cooley-Tukey FFT,
 // which splits the input sequence into even and odd halves.
-template<typename T>
-int SpectralOps<T>::UpperLog2(const int N)
+
+inline int UpperLog2(const int N)
 {
     for (int i = 0; i < 30; ++i) // For the first 30 powers of 2
     {                            // Compute the power of 2 as 2^i
@@ -685,8 +643,8 @@ int SpectralOps<T>::UpperLog2(const int N)
     return 30;                   // Else return 30 as the upper bound.
 }
 
-template<typename T>
-vector<int>SpectralOps<T>::ToInt(const vector<complex<T>> &s)
+
+inline vector<int>ToInt(const vector<complex<T>> &s)
 {
     vector<int> sInt(s.size());
     for (size_t i = 0; i < s.size(); ++i)
@@ -694,8 +652,8 @@ vector<int>SpectralOps<T>::ToInt(const vector<complex<T>> &s)
     return sInt;
 }
 
-template<typename T>
-vector<double> SpectralOps<T>::ToReal(const vector<complex<T>> &s)
+
+inline vector<double> ToReal(const vector<complex<T>> &s)
 {
     vector<double> sReal(s.size());
     for (size_t i = 0; i < s.size(); ++i)
@@ -703,8 +661,8 @@ vector<double> SpectralOps<T>::ToReal(const vector<complex<T>> &s)
     return sReal;
 }
 // Determine the amount of frequency bins to analyze per second of data.
-template<typename T>
-vector<T> SpectralOps<T>::SetRBW(double rbw, double fs)
+
+inline vector<T> SetRBW(double rbw, double fs)
 {
   const int wSiz=static_cast<int>(fs/rbw);
   // Window is assumed to have been defined by the caller before calling this
@@ -727,8 +685,8 @@ vector<T> SpectralOps<T>::SetRBW(double rbw, double fs)
 /* @param nBits: log2(N) where N is the length of the signal, total number of FFT stages.
 /* Reference: https://github.com/AndaOuyang/FFT/blob/main/fft.cpp
 */
-template<typename T>
-void SpectralOps<T>::ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &twiddles, const int rot, const int nBits)
+
+inline void ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &twiddles, const int rot, const int nBits)
 {
   if (rot == nBits)                          // Are we at the last stage of the FFT?
     return;                                  // Yes, so stop recursion.
@@ -783,8 +741,8 @@ void SpectralOps<T>::ForwardButterfly(vector<T> &last, vector<T> &curr, const ve
   ForwardButterfly(curr, last, twiddles, rot + 1, nBits); // Recurse to the next stage.
 }
 // Bit reversal permutation for the Cooley-Tukey FFT algorithm.
-template<typename T>
-void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
+
+inline void  BitReversal(vector<T> &s, const int nBits)
 {
     // -------------------------------- //
     // Base Case: If the input size is <=2, no permutation necessary
@@ -853,8 +811,8 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //   returns (a[1..p], σ²) where σ² is the final prediction error.
     //   “order” = p.  We assume r.size() >= p+1.
     // ------------------------------------------------------------------------
-    template<typename T>
-    std::pair<std::vector<T>, T>SpectralOps<T>::
+    
+    inline std::pair<std::vector<T>, T>
     LevinsonDurbin(const std::vector<T>& r, int order) const
     {
         // r: autocorrelation, r[0] … r[order]
@@ -910,8 +868,8 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
     //    at Nfft points, returning a vector<complex<T>> of length Nfft
     //    (you can take real(H) or abs(H)² as your PSD). 
     // ------------------------------------------------------------------------
-    template<typename T>
-    std::vector<std::complex<T>>SpectralOps<T>::
+    
+    inline std::vector<std::complex<T>>
     AR_PSD(const std::vector<T>& r, int order, int fftsize) const
     {
         if (order < 1 || (int)r.size() < order+1) {
@@ -950,8 +908,8 @@ void SpectralOps<T>:: BitReversal(vector<T> &s, const int nBits)
 // eigenvectors of the FFT matrix. This is useful for computing the eigenvalues
 // and eigenvectors of the FFT matrix, which can be used for spectral analysis
 // to obtain phase information.
-template<typename T>
-std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStrideEig(const vector<complex<T>> &s)
+
+inline std::pair<vector<complex<T>>,vector<vector<complex<T>>>> FFTStrideEig(const vector<complex<T>> &s)
 {
   if (s.empty())                        // Is the input signal empty?
     return {vector<complex<T>>(), vector<vector<complex<T>>>()}; // Yes, so return empty vectors.
@@ -1004,8 +962,8 @@ std::pair<vector<complex<T>>,vector<vector<complex<T>>>> SpectralOps<T>::FFTStri
   return {curr, eigvecs};               // Return the computed FFT spectrum and the eigenvectors.
 }
 
-template<typename T>
-vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
+
+inline vector<complex<T>> FFTStride (const vector<complex<T>> &s)
 {
     // ---------------------------------- //
     // Base Case: If the input is empty, return an empty vector.
@@ -1068,8 +1026,8 @@ vector<complex<T>> SpectralOps<T>::FFTStride (const vector<complex<T>> &s)
 // We know that FFT is circularly periodic, thus X[m]=X[-k]=X[n-k]. 
 // Therefore we can get X[m], simply by reversing the order of X[k].
 // --------------------------------------------------------------
-template<typename T>
-vector<complex<T>> SpectralOps<T>:: IFFTStride (const vector<complex<T>>& s)
+
+inline vector<complex<T>>  IFFTStride (const vector<complex<T>>& s)
 {
   vector<complex<T>> sConj(s);          // Copy the input signal.
   // ---------------------------------- //
@@ -1110,8 +1068,8 @@ vector<complex<T>> SpectralOps<T>:: IFFTStride (const vector<complex<T>>& s)
 // Note that this algorithm should be slower than the FFT Stride above, but it 
 // is also clearer. 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template<typename T>
-vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
+
+inline vector<complex<T>>  FFT(const vector<complex<T>>& s)
 {
   const int N=s.size();                 // The length of the input signal.
     // -------------------------------- //
@@ -1179,8 +1137,8 @@ vector<complex<T>> SpectralOps<T>:: FFT(const vector<complex<T>>& s)
 // Note that this algorithm should be slower than the IFFT Stride above, but it 
 // is also clearer.
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template<typename T>
-vector<complex<T>> SpectralOps<T>:: IFFT (const vector<complex<T>> &s)
+
+inline vector<complex<T>>  IFFT (const vector<complex<T>> &s)
 {
   const int N=s.size();                 // Get the length of the signal.
     // -------------------------------- //
@@ -1206,8 +1164,8 @@ vector<complex<T>> SpectralOps<T>:: IFFT (const vector<complex<T>> &s)
 // the convolution is done between an input signal s(n) of length N  and
 // filter of length N h(n).
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template<typename T>
-vector<complex<T>> SpectralOps<T>::Convolution( // Obtain the product of two signals.
+
+inline vector<complex<T>> Convolution( // Obtain the product of two signals.
     const vector<complex<T>> &s,        // Our input signal.
     const vector<complex<T>> &h)        // Our filter.
 {                                       // ---------- Convolution ----------- //
@@ -1242,8 +1200,8 @@ vector<complex<T>> SpectralOps<T>::Convolution( // Obtain the product of two sig
 }                                       // ---------- Convolution ----------- //
 
 // Multiply two-length-N spectra element by element.
-template<typename T>
-vector<complex<T>> SpectralOps<T>::PointwiseMul(const std::vector<std::complex<T>>& A,const std::vector<std::complex<T>>& B) const
+
+inline vector<complex<T>> PointwiseMul(const std::vector<std::complex<T>>& A,const std::vector<std::complex<T>>& B) const
 {                                       // ---------- PointwiseMul ----------- //
   assert(A.size()==B.size());           // Ensure both spectra are of the same length.
   std::vector<std::complex<T>> C(A.size()); // Create a vector to hold the result.
@@ -1253,8 +1211,8 @@ vector<complex<T>> SpectralOps<T>::PointwiseMul(const std::vector<std::complex<T
 }                                       // ---------- PointwiseMul ----------- //
 
 // Short-Time Fourier Transform
-template<typename T>
-vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s, 
+
+inline vector<vector<complex<T>>> STFT(const vector<complex<T>> &s, 
   const WindowType &w, 
   int wSiz, 
   const float overlap)
@@ -1284,9 +1242,9 @@ vector<vector<complex<T>>> SpectralOps<T>::STFT(const vector<complex<T>> &s,
   }                                     // Done with all segments.            
   return sMat;                          // The windowed spectrum.
 }
-template<typename T>
+
 // Inverse Short-Time-Fourier-Transform Method.
-vector<complex<T>> SpectralOps<T>::ISTFT(
+inline vector<complex<T>> ISTFT(
     const vector<vector<complex<T>>> &sMat,// Input STFT matrix
     const WindowType &w,                // Window type
     const int wSiz,                     // Window size (should be power of 2)
@@ -1340,8 +1298,8 @@ vector<complex<T>> SpectralOps<T>::ISTFT(
     return sig;
 }
 // vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap)
-template<typename T>
-vector<complex<T>> SpectralOps<T>::OLAProcessor(
+
+inline vector<complex<T>> OLAProcessor(
     const vector<complex<T>> &s, // The input signal.
     const vector<complex<T>> &h, // The desired FIR filter.
     const WindowType &w,         // The window used.
@@ -1364,8 +1322,8 @@ vector<complex<T>> SpectralOps<T>::OLAProcessor(
     return ISTFT(sig, w, wSiz, ovlap);
 }
 // vector<complex<T>> OLAProcessor(const vector<complex<T>> &s, const vector<complex<T>> &h, const WindowType &w, const int wSiz, const float ovlap)
-template<typename T>
-vector<complex<T>> SpectralOps<T>::OLAProcessor(
+
+inline vector<complex<T>> OLAProcessor(
     const vector<complex<T>> &s, // The input signal.
     const WindowType &w,         // The window used.
     const int wSiz,              // The size of the window.
@@ -1388,8 +1346,8 @@ vector<complex<T>> SpectralOps<T>::OLAProcessor(
     return ISTFT(sig, w, wSiz, ovlap);
 }
 // Determine the power sepctral density of a windowed signal using Welch's method.
-template<typename T>
-vector<T> SpectralOps<T>::WelchPSD(
+
+inline vector<T> WelchPSD(
  const vector<T> &s,                    // The signal to process.
  const WindowType& w,                   // The window to apply to the signal.
  const int wSiz,                        // The size of the window.
@@ -1442,8 +1400,8 @@ vector<T> SpectralOps<T>::WelchPSD(
 
 }
 // Method to perform a frequency shift of the center frequency by a const amount
-template<typename T>
-vector<complex<T>> SpectralOps<T>::Shift(  // Shift the signal in frequency domain.
+
+inline vector<complex<T>> Shift(  // Shift the signal in frequency domain.
   const vector<complex<T>>& s,           // The input signal.
   const double fShift,                  // The amount to shift it by
   const double fs)                      // The sample rate of the signal
@@ -1460,8 +1418,8 @@ vector<complex<T>> SpectralOps<T>::Shift(  // Shift the signal in frequency doma
 }                                       // ---------- Shift ----------------- //
 // Method to perform a carrier sweep with a start and stop frequency about the 
 // center frequency
-template<typename T>
-vector<vector<complex<T>>> SpectralOps<T>::Sweep(
+
+inline vector<vector<complex<T>>> Sweep(
   const vector<complex<T>>&s,           // The input signal
   const double fStart,                  // The Start Frequency.
   const double fCenter,                 // The center frequency
@@ -1515,6 +1473,18 @@ vector<vector<complex<T>>> SpectralOps<T>::Sweep(
     // sweep, return the full signal's spectra.
     // -------------------------------- //
   return sMat;
-} 
-#endif // SPECTRALOPS_H
+}
 
+private:
+    vector<T> signal;                        // The signal to process.
+    vector<T> subCarrier;                    // 
+    WindowType window;                       // The window to apply to the signal.
+    int windowSize=0;                    // The size of the window.
+    float overlap;                     // The overlap factor.
+    vector<complex<T>> twiddles;             // Precomputed twiddles factors.
+    double sRate;                      // The rate at which we sampled the RF.
+    int length;                        // The length of the signal.
+};
+
+
+}
