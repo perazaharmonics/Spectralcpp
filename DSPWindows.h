@@ -3,6 +3,7 @@
 #include <vector>
 #include <complex>
 #include <cmath>
+#include <algorithm>
 #include <iostream>
 #include <valarray>
 #include <cstdint>
@@ -46,6 +47,11 @@ public:
     {
         return data[idx]; // Return the element at index idx.
     }
+    T& operator[](size_t idx) {return data[idx];}
+    auto begin(void) noexcept { return data.begin(); }
+    auto end(void) noexcept { return data.end(); }
+    auto begin(void) const noexcept { return data.cbegin(); }
+    auto end(void) const noexcept { return data.cend(); }
     // Accessors
    inline  const Window<T> GetWindow (void) const { return window; }
    const inline int GetWindowsize (void) const { return windowsize; }
@@ -72,16 +78,16 @@ public:
     {
         switch (w)                          // Set windows according to window type.
         {
-            case WindowType::Hanning:         data=Hanning(N);
-            case WindowType::Hamming:         data=Hamming(N);
-            case WindowType::BlackmanHarris:  data=BlackmanHarris(N);
-            case WindowType::ExactBlackman:   data=ExactBlackman(N);
-            case WindowType::Blackman:        data=Blackman(N);
-            case WindowType::FlatTop:         data=FlatTop(N);
-            case WindowType::FourTermBHarris: data=FourTermBHarris(N);
-            case WindowType::SevenTermBHarris:data=SevenTermBHarris(N);
-            case WindowType::LowSideLobe:     data=LowSideLobe(N);
-            case WindowType::Rectangular:     data=Rectangular(N);
+            case WindowType::Hanning:         data=Hanning(N);break;
+            case WindowType::Hamming:         data=Hamming(N);break;
+            case WindowType::BlackmanHarris:  data=BlackmanHarris(N);break;
+            case WindowType::ExactBlackman:   data=ExactBlackman(N);break;
+            case WindowType::Blackman:        data=Blackman(N);break;
+            case WindowType::FlatTop:         data=FlatTop(N);break;
+            case WindowType::FourTermBHarris: data=FourTermBHarris(N);break;
+            case WindowType::SevenTermBHarris:data=SevenTermBHarris(N);break;
+            case WindowType::LowSideLobe:     data=LowSideLobe(N);break;
+            case WindowType::Rectangular:     data=Rectangular(N);break;
             default:                          data=Rectangular(N);
         }
         return data;                          // Return the generated window data.
