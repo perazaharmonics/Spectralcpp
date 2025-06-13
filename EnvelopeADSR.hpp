@@ -66,12 +66,12 @@ namespace dsp{
           break;                        // Done handling decay, switch to next case.
         case Stage::Sustain:            // We are at the sustain stage of the machine:
           val-=inc(this->release)*this->sustain; // Decrement the value by the release increment.
-          if (this->val<=0.0f)          // IDone with sustain stage?
-          {                             //
-            this->val=0;                // Yes, we reached the end of the sustain stage.
-            this->Next(Stage::Idle);// Clamp the value to 0 and move to idle stage
-            break;                      // Done handling sustain, switch to next case.
-          }
+          // In sustain we just hold the value at the sustain level while the note is down.
+          // NO-OP, just break.
+          break;
+        case Stage::Release:            // We are in the release stage
+          this->val_=inc(this->release);// Graceful tail.
+          if (this->val<=0.0f) { this->val=0.0f;Next(Stage::Idle); }
         case Stage::Idle:               // Idla part of the machine:
           default:break;                // Yes, so NO-OP.
         }                               // Done with switch.
@@ -100,7 +100,7 @@ private:
   uint64_t n{0};                        // The sample counter.
   T val{0};                             // The current value of the envelope.
 
-  inline constexpr T inc(double time) const noexcept { return (time<=0.0f)?1.0:1.0/(time*this->fs);}
+  inline constexpr T inc(double time) const noexcept { return (time<=0.0f)?T(1):T(1.0/(time*this->fs));}
   inline void Next(Stage n) noexcept 
   { 
     this->state=n;                      // Set the next state.
