@@ -70,7 +70,7 @@ namespace dsp{
           // NO-OP, just break.
           break;
         case Stage::Release:            // We are in the release stage
-          this->val_=inc(this->release);// Graceful tail.
+          this->val=inc(this->release);// Graceful tail.
           if (this->val<=0.0f) { this->val=0.0f;Next(Stage::Idle); }
         case Stage::Idle:               // Idla part of the machine:
           default:break;                // Yes, so NO-OP.
