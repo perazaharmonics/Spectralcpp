@@ -43,7 +43,20 @@ namespace dsp
     a2 = T(t.a2);
     z1 = z2 = T(0);
   }
-
+  void Set(BiQuad& f) noexcept
+  {
+    const double g=1.0;                 // Assume taps are normalized.
+    b0=T(f.b0/g);                       // Set the feedforward coefficient b0.
+    b1=T(f.b1/g);                       // Set the feedforward coefficient b1.
+    b2=T(f.b2/g);                       // Set the feedforward coefficient b2.
+    a1=T(f.a1/g);                       // Set the feedback coefficient a1.
+    a2=T(f.a2/g);                       // Set the feedback coefficient a2.
+    z1=z2=T(0);                         // Reset the state variables z1 and z2.
+  }
+  inline void Reset(void) noexcept
+  {
+    z1=z2=T(0);
+  }
   //! Process one sample
   T ProcessSample(T x) noexcept
   {
@@ -95,7 +108,42 @@ namespace dsp
       default: return false;
     }
   }
+  // API:
+  inline void SetSamplingFrequency(double fs_) noexcept
+  {
+    this->fs=fs_; 
+    this->Ts=1.0/fs_; // Set the sampling frequency and calculate the sampling period.
+  } // Set the sampling frequency.
+  inline void SetSlope(double slope) noexcept
+  {
+    this->slope=slope; // Set the shelving tilt, slope.
+  } // Set the shelving tilt, slope.
+  inline double GetSamplingFrequency(void) const noexcept
+  {
+    return fs; // Get the sampling frequency.
+  } // Get the sampling frequency.
+  inline void SetCutoffFrequency(double fc) noexcept
+  {
+    cutoff = fc; // Set the cutoff frequency.
+  } // Set the cutoff frequency.
+  inline double GetCutoffFrequency(void) const noexcept
+  {
+    return cutoff; // Get the cutoff frequency.
+  } // Get the cutoff frequency.
+  inline void SetQualityFactor(double q) noexcept
+  {
+    Q = q; // Set the quality factor.
+  } // Set the quality factor.
+  inline double GetQualityFactor(void) const noexcept
+  {
+    return Q; // Get the quality factor.
+  } // Get the quality factor.
   private:
+    double fs{48000.0f};               // Sampling frequency.
+    double Ts{1.0/fs};                 // Sampling period.
+    double slope{0.0f};                // Shelving tilt, slope.
+    double cutoff{1000.0f};          // Cutoff frequency in Hz.
+    double Q{0.70710678f}; // Quality factor.
     T b0{0.0f};                            // Feedforward coefficient b0.
     T b1{0.0f};                            // Feedforward coefficient b1.
     T b2{0.0f};                            // Feedforward coefficient b2.
@@ -514,7 +562,7 @@ inline BiQuad<float>::Taps EllipticFirstOrder(
     const double fs,                    // The sampling frequency.
     const double fc,                    // Filter cutoff freq.
     const double gain_db,               // Gain in dB.
-    const double Q)                     // Low shelf, shelf slope.
+    const double S)                     // Low shelf, shelf slope.
   {                                     // ------------- LowShelf ------------- //
     if (fs<=0.0f||fc<=0.0f||fc>=fs*0.5f) // Is the sampling frequency or cutoff freq invalid?
       return {};                        // Yes, return an empty Taps structure.
@@ -528,7 +576,7 @@ inline BiQuad<float>::Taps EllipticFirstOrder(
     double sinw0=std::sin(w0);          // Calculate the sine of w0.
     double sqrtA=std::sqrt(A);          // Calculate the square root of A.
     // Use the shelf-slope formula to get alpha from Q and A.
-    double alpha=sinw0/2.0f*std::sqrt((A+1.0f/A)*(1.0f/Q-1.0)+2.0f);
+    double alpha=sinw0/2.0f*std::sqrt((A+1.0f/A)*(1.0f/S-1.0)+2.0f);
     // Now we compute the unnormalized coefficients.
     double b0=A*((A+1.0f)-(A-1.0f)*cosw0+2.0f*sqrtA*alpha); // Our feedforward coefficient b0.
     double b1=2.0f*A*((A-1.0f)-(A+1.0f)*cosw0); // Our feedforward coefficient b1.
@@ -551,7 +599,7 @@ inline BiQuad<float>::Taps EllipticFirstOrder(
     const double fs,                    // The sampling frequency.
     const double fc,                    // Filter cutoff freq.
     const double gain_db,               // Gain in dB.
-    const double Q=0.70710678f)         // High shelf Q factor.
+    const double S=0.70710678f)         // High shelf Q factor.
   {                                     // ------------- HighShelf ------------- //
     if (fs<=0.0f||fc<=0.0f||fc>=fs*0.5f) // Is the sampling frequency or cutoff freq invalid?
       return {};                        // Yes, return an empty Taps structure.
@@ -565,7 +613,7 @@ inline BiQuad<float>::Taps EllipticFirstOrder(
     double sinw0=std::sin(w0);          // Calculate the sine of w0.
     double sqrtA=std::sqrt(A);          // Calculate the square root of A.
     // Use the shelf-slope formula to get alpha from Q and A.
-    double alpha=sinw0/2.0f*std::sqrt((A+1.0f/A)*(1.0f/Q-1.0)+2.0f);
+    double alpha=sinw0/2.0f*std::sqrt((A+1.0f/A)*(1.0f/S-1.0)+2.0f);
     // Now we compute the unnormalized coefficients.
     double b0=A*((A+1.0f)+(A-1.0f)*cosw0+2.0f*sqrtA*alpha); // Our feedforward coefficient b0.
     double b1=-2.0f*A*((A-1.0f)+(A+1.0f)*cosw0); // Our feedforward coefficient b1.
@@ -620,4 +668,3 @@ inline BiQuad<float>::Taps EllipticFirstOrder(
     };                                  // Return peaking EQ filter taps structure.
   }                                     // ------------- PeakingEQ ------------- //
 } // namespace dsp
-
