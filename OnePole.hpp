@@ -13,9 +13,10 @@
 #pragma once
 #include <cmath>
 #include <cstddef>
-#include "FCWTransforms.h"
+#include "spectral/FCWTransforms.h"
 namespace dsp
 {
+  using namespace dsp::spectral; // Use the spectral operations namespace.
   template<typename T=float>
   class OnePole
   {
@@ -26,28 +27,18 @@ namespace dsp
       OnePole& operator=(const OnePole&) noexcept = default; // Copy assignment.
       OnePole& operator=(OnePole&&) noexcept = default; // Move assignment.
       ~OnePole() noexcept = default;    // Destructor.
-    enum class Conf { LowPass, Highpass }; // Filter Conf.
-      bool Prepare(                     // Prepare the filter for processing.
+    enum class Conf { Lowpass, Highpass }; // Filter Conf.
+    // Call this once - *After* choosing the filter Conf (LP or HP).
+    bool Prepare(                     // Prepare the filter for processing.
       double fs,                        // The sampling frequency.
       double cutoff) noexcept   // The default filter Conf.
       {                                 // ----------- Prepare ----------- //
         if (fs<=0.0||cutoff<=0.0||cutoff>=fs*0.5)// No fs or cutoff?
           return false;                 // Don't know where to operate, return false.
-        double phase{std::exp(-2.0*M_PI*cutoff/fs)};// Set the phase factor.
-        // ---------------------------- //
-        // Now we will arrange the filter coeffiecient based on the Conf of filter.
-        // ---------------------------- //
-        if (this->mode==Conf::LowPass)    // Do we want a lowwpass filter?
-        {                               // Set the filter weights...
-           this->a0=1.0-phase;          // a0 is the gain.
-           this->b1=phase;              // b1 is the feedback coefficient or zero.
-        }                               // Done with lowpass filter
-        else                            // Else they want w highpass filter.
-        {                               // Set the filter coeffs...
-          this->a0=(1.0+phase);         // a0 is the gain.
-          this->b1=phase-1.0;           // b1 is the feedback coefficient.
-        }                               // Done with highpass filter.
-        this->z1=0.0;                   // Reset the filter state.
+        this->fs=fs;                    // Set the sampling frequency.
+        this->cutoff=cutoff;            // Set the cutoff frequency.
+        calcCoeffs();                   // Calculate the filter coefficients.
+        this->z1=T(0);                  // Initialize the filter state to zero.
         return true;                    // Return true, we are ready.
       }                                 // ----------- Prepare ----------- //
       T ProcessSample(                  // Process a single sample.
@@ -60,18 +51,27 @@ namespace dsp
        }                                // ----------- ProcessSample --------- //
       void Reset(void) noexcept { this->z1=0.0; } // Reset the filter state.
       // Getters and setters for the filter parameters.
-      inline void SetConf(Conf t) noexcept { this->mode=t; } // Set the filter Conf.
-      inline Conf GetConf(void) const noexcept { return this->mode; } // Get the filter Conf.
-      inline T GetGain(void) const noexcept { return this->a0; } // Get the filter gain.
-      inline T GetFeedback(void) const noexcept { return this->b1; } // Get the feedback coefficient.
-      inline T GetState(void) const noexcept { return this->z1; } // Get the filter state.
-      inline void SetState(T z) noexcept { this->z1=z; } // Set the filter state.
-      
+      inline void SetConf(Conf t) noexcept { this->mode=t;calcCoeffs(); } // Set the filter Conf.
     private:
-      Conf mode{Conf::LowPass};         // The innate filter description.
+      Conf mode{Conf::Lowpass};         // The innate filter description.
       T a0{1.0};                        // The innate filter gain.
       T b1{0.0};                        // The feedback coefficient.
       T z1{0.0};                        // The innate filter form of being (state).
-
+      double fs{48000.0};               // The sampling frequency.
+      double cutoff{1000.0};            // The cutoff frequency in Hz.
+      void calcCoeffs(void) noexcept
+      {
+        const double phase=std::exp(-2.0*M_PI*this->cutoff/this->fs);
+        if (this->mode==Conf::Lowpass)  // Does the user want a lowpass?
+        {
+          this->a0=1.0-phase;           // Set the gain for lowpass.
+          this->b1=phase;               // Set the feedback coefficient for lowpass.
+        } 
+        else                            // Else they want a highpass.
+        {
+          this->a0=1.0+phase;           // Set the gain for highpass.
+          this->b1=phase-1.0;           // Set the feedback coefficient for highpass.
+        }                               // Done setting the coeffs.
+      }
     };
 }
