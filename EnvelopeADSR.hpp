@@ -65,7 +65,6 @@ namespace dsp{
           }                             // Done with decay stage.
           break;                        // Done handling decay, switch to next case.
         case Stage::Sustain:            // We are at the sustain stage of the machine:
-          val-=inc(this->release)*this->sustain; // Decrement the value by the release increment.
           // In sustain we just hold the value at the sustain level while the note is down.
           // NO-OP, just break.
           break;
