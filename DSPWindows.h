@@ -34,6 +34,7 @@ public:
         Bartlett,
         Gaussian,
         Kaiser,
+        SquareRootHann
     };
 
     Window(void)
@@ -111,6 +112,7 @@ public:
             case WindowType::Bartlett:        data=Bartlett(N);break;            
             case WindowType::Gaussian:        data=Gaussian(N,sigma);break;
             case WindowType::Kaiser:          data=Kaiser(N, alpha);break;
+            case WindowType::SquareRootHann   data=SquareRootHann(N);break;
             default:                          data=Rectangular(N);
         }
         return data;                          // Return the generated window data.
@@ -298,6 +300,11 @@ public:
       }
       return w;                         // Return the Kaiser window.
     }                                   // ------------- Kaiser ------------------ //
+    inline vector<T> SquareRootHann(const size_t N)
+    {                                  // -------------- SquareRootHann ---------- //
+      vector<T> w(N,T(0));             // Initialize our window.
+      for (size_t n=0;n<N;++n)         // For the length of the window....
+    }
     inline vector<T> Rectangular(const size_t N)
     {
         vector<T> w(N, T(1)); // Rectangular window is all ones.
