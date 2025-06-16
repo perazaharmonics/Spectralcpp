@@ -185,7 +185,7 @@ namespace dsp::wg
     const auto yTimeL=xTime;            // Store the time domain output for left channel.
     //xTime=engine.IFFT(yFreqR);          // Inverse FFT for right channel.
     //for (auto &c:xTime) c*=(1.f/fftSize);
-    xtime=engine.IFFTStride(yFreqR);    // Stride permutation IFFT on right channel.
+    xTime=engine.IFFTStride(yFreqR);    // Stride permutation IFFT on right channel.
     const auto yTimeR=xTime;            // Store the time domain output for right channel.
     // ----------------------------------- //
     // 4. ********* SYNTHESIS windowing & overlap-add *********
