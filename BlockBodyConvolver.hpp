@@ -43,6 +43,16 @@ namespace dsp::wg
       outOLAL.assign(M,0.0f);           // Overlap-add output ring buffer for left channel.
       outOLAR.assign(M,0.0f);           // Overlap-add output ring buffer for right channel.
       // Initialize the window object with Hanning window.
+      win.GenerateWindow(Window<float>::WindowType::MLTSine,2*M);
+      // Because we changed the window to a Modulated Lapped Transform sine window,
+      // We don't need to take the square root of Hann, nor phase-shift or rotate the window
+      // by M/2. We have reduced computations slightly. Becuase the MLTSine window is centered
+      // exactly one hop (M samples) apart, so the first half covers the tail of the previous block
+      // and the second half of the window the head of the current one.
+      // The new MLT Sine window also ensures
+      // Perfect Reconstruction (PR) when doing COLA/WOLA/OLA, and is commonly used by Audio DSP Engineers
+      // for its nice spectral qualitites
+      /*
       win.GenerateWindow(Window<float>::WindowType::Hanning,2*M);
       // Shift by half-sample so w[0]=0.5,w[m]=0.5
       for (auto& w:win)
@@ -50,6 +60,7 @@ namespace dsp::wg
       // A 50% overlap needs it centered  at M/2 but our window
       // is centered at M-1, so we rotate it.
       std::rotate(win.begin(),win.begin()+M/2,win.end());
+      */
       engine.SetSampleRate(fs);         // Set the sample rate for the spectral engine.
       engine.SetSamples(fftSize);       // Set the number of samples for the spectral engine.
       partCount=0;                      // Reset partition count.
@@ -122,17 +133,24 @@ namespace dsp::wg
       std::fill(prevIn.begin(),prevIn.end(),0.0f);// Start first window with silence.
     }                                      // Done checking if first FFT partition.
     assert (M&&"Prepare() not called"); // Ensure we have a block size.
-    // 1. Window input into xTime and zero-pad.
-    for (std::size_t n=0;n<M;++n)
-    {                           // Feed 2*M samples to the FFT.
-      // Previous half-window (tail of the last).
-      xTime[n]={prevIn[n]*win[n],0.0f};       // Previous half-window samples.
-      // Current half-window (head of the current).
-      xTime[n+M]={in[n]*win[n+M],0.0f};        // Current half-window samples.
-      // Store the current impulse sample because it'll be the 
-      // prev of the next block.
-      prevIn[n]=in[n];                        // Store the current input sample for the next block.
-    }
+    // ----------------------------------- //
+    // 1. ********* ANALYSIS Windowing & frame-to-zero. *********
+    // Build a length 2*M frame starting at time index 0:
+    //  
+    //     tail of previous hop*w[n]
+    //     head of current hop*w[n+M]
+    //     --> xTime[ 0...2*M-1] contains the MLTSine-windowed frame.
+    //  Window input into xTime and zero-pad.
+    // ---------------------------------------- //
+    for (std::size_t n=0;n<M;++n)               // For each sample in this block....
+    {                                           // Apply analysis window.
+      // -------------------------------------- //
+      // Spectral Analysis window.    
+      // ------------------------------------- //
+      xTime[n]={prevIn[n]*win[n],0.0f};         // Analysis win, 1st half.
+      xTime[n+M]={in[n]*win[n+M],0.0f};         // Analysis window 2nd half.
+      prevIn[n]=in[n];                          // Store the next hop.
+    }                                           // Done applying analysis window.
     std::fprintf(stderr,"xTime0=%g\n",xTime[0].real()); // Debug: Print the first sample of xTime.
     // Zero-pad the rest (indices 2M ...ftSize-1).
     std::fill(xTime.begin()+2*M,xTime.end(),std::complex<float>{});
@@ -169,34 +187,38 @@ namespace dsp::wg
     //for (auto &c:xTime) c*=(1.f/fftSize);
     xtime=engine.IFFTStride(yFreqR);    // Stride permutation IFFT on right channel.
     const auto yTimeR=xTime;            // Store the time domain output for right channel.
-    // 4. Overlap-add the output.
-    for (size_t n=0; n<M;++n)
-    {
-      const float w0=win[n];            // Sqrt(Hann) analysis window value at n.
-      const float w1=win[n+M];          // ... second hald of the window (because win.size()==2).      float w
-      // ------------------------------ //
-      // Note: win[0…nZero-1] == 0 after the M/2 rotation, so the first few
-      // samples of wetL / wetR are guaranteed to be 0.  This is expected –
-      // they’ll be supplied by the overlap from the previous/next block.
-      // ------------------------------ //
+    // ----------------------------------- //
+    // 4. ********* SYNTHESIS windowing & overlap-add *********
+    //    After IFFT we have 2*M time samples:
+    //
+    //    front half -> multiply by w[n] and add stored overlap.
+    //    back half ->  multiply by w[n+M] and store as next overlap.
+    // ------------------------------- //
+    for (size_t n=0; n<M;++n)          // For every sample in this block.... 
+    {                                  // Apply synthesis window, then overlap-add
+      // ----------------------------- //
+      // Spectral synthesis window.
+      // ----------------------------- //
+      const float w0=win[n];            // MLTSine synthesis window, first half
+      const float w1=win[n+M];          // synthesis window, second half.
       float wetL=yTimeL[n].real()*w0+outOLAL[n];// Overlap-add for left channel.
       float wetR=yTimeR[n].real()*w0+outOLAR[n]; // Overlap-add for right channel.
       // Given that the OLA algorithm already folds the previous block's tail into outOLAL/outOLAR
       // We overwrite the value in outL/outR instead of accumulating it. Accumulating it would double
       // the history every window hop, which is not what we want.
-      outL[n]=wetL;                     // Overwrite, not accumulate.
-      outR[n]=wetR;                     // Overwrite, not accumulate.
-      outOLAL[n]=yTimeL[n+M].real()*w1; // Stage next block overlap, windowed.
-      outOLAR[n]=yTimeR[n+M].real()*w1; // Stage next block overlap, windowed.
-    }                                   // Done OLA Processing.
+      outL[n]=wetL;                     // Write current block, not accumulate.
+      outR[n]=wetR;                     // Write current block, not accumulate.
+      outOLAL[n]=yTimeL[n+M].real()*w1; // Stage overlap for next block.
+      outOLAR[n]=yTimeR[n+M].real()*w1; // Stage overlap for next block.
+    }                                   // Done OLA Processing THIS M sized block.
     
     // 5. Update the partition index.
     partIndex=(partIndex+1)%partCount; // Increment the partition index and wrap around.
-  }                                    // ------------ ProcessBlock --------------------- //
+  }                                    // ------------  --------------------- //
   void Process(const AudioBuffer<float>& monoIn,AudioBuffer<float>& stereoOut) noexcept
   {
     assert(monoIn.Channels()==1&&stereoOut.Channels()>=2);
-    ProcessBlock(monoIn.Channel(0),stereoOut.Channel(0),stereoOut.Channel(1));
+    (monoIn.Channel(0),stereoOut.Channel(0),stereoOut.Channel(1));
   }
   /// API:
   double GetSampleRate(void) const noexcept { return fs; } // Get the sample rate.
