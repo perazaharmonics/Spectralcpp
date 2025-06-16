@@ -116,9 +116,11 @@ namespace dsp::wg
       std::memcpy(outR,in,M*sizeof(float));
       return; // No IR loaded, just copy input to output.
     }
-    if (partIndex==0)
+    if (partIndex==0)                       // Are we in the first FFT partition?
+    {                                       // Yes, so we will...
       //std::fill(prevIn.begin(),prevIn.end(),in[0]);
-      std::fill(prevIn.begin(),prevIn.end(),0.0f);// Start with silence.
+      std::fill(prevIn.begin(),prevIn.end(),0.0f);// Start first window with silence.
+    }                                      // Done checking if first FFT partition.
     assert (M&&"Prepare() not called"); // Ensure we have a block size.
     // 1. Window input into xTime and zero-pad.
     for (std::size_t n=0;n<M;++n)
@@ -135,7 +137,8 @@ namespace dsp::wg
     // Zero-pad the rest (indices 2M ...ftSize-1).
     std::fill(xTime.begin()+2*M,xTime.end(),std::complex<float>{});
     // Perform FFT on xTime to get xFreq.
-    xFreq=engine.FFT(xTime);
+    //xFreq=engine.FFT(xTime);
+    xFreq=engine.FFTStride(xTime);
     Xq[partIndex]=xFreq;          // Store the input spectrum in the circular buffer.
     // 2. Convolve with the IR spectra.
     std::fill(yFreqL.begin(),yFreqL.end(),std::complex<float>{}); // Clear the output spectrum for left channel.
@@ -155,11 +158,16 @@ namespace dsp::wg
       }                                 // Done convolving the input spectrum with the IR spectra.
     }                                   // Done processing all partitions.
     // 3. Perform IFFT on the output spectra.
-    xTime=engine.IFFT(yFreqL);          // Inverse FFT for left channel.
-    for (auto &c: xTime) c*=(1.f/fftSize);
+    // Replaced FFT/IFFT with FFTStride/IFFTStride because it might be faster.
+    // But FFTStride/IFFTStride already normalize so we comment out the for loops that normalized
+    // after IFFT because we do not need them anymore.
+    //xTime=engine.IFFT(yFreqL);          // Inverse FFT for left channel.
+    //for (auto &c: xTime) c*=(1.f/fftSize);
+    xTime=engine.IFFTStride(yFreqL);    // Inverse FFT the left channel.
     const auto yTimeL=xTime;            // Store the time domain output for left channel.
-    xTime=engine.IFFT(yFreqR);          // Inverse FFT for right channel.
-    for (auto &c:xTime) c*=(1.f/fftSize);
+    //xTime=engine.IFFT(yFreqR);          // Inverse FFT for right channel.
+    //for (auto &c:xTime) c*=(1.f/fftSize);
+    xtime=engine.IFFTStride(yFreqR);    // Stride permutation IFFT on right channel.
     const auto yTimeR=xTime;            // Store the time domain output for right channel.
     // 4. Overlap-add the output.
     for (size_t n=0; n<M;++n)
