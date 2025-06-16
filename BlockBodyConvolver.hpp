@@ -218,7 +218,9 @@ namespace dsp::wg
   void Process(const AudioBuffer<float>& monoIn,AudioBuffer<float>& stereoOut) noexcept
   {
     assert(monoIn.Channels()==1&&stereoOut.Channels()>=2);
-    (monoIn.Channel(0),stereoOut.Channel(0),stereoOut.Channel(1));
+    ProcessBlock(monoIn.Channel(0),     // Analysis pointer.
+      stereoOut.Channel(0),             // Left output
+      stereoOut.Channel(1));            // Right output
   }
   /// API:
   double GetSampleRate(void) const noexcept { return fs; } // Get the sample rate.
