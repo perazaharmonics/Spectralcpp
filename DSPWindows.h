@@ -34,7 +34,8 @@ public:
         Bartlett,
         Gaussian,
         Kaiser,
-        SquareRootHann
+        SquareRootHann,
+        MLTSine
     };
 
     Window(void)
@@ -113,6 +114,7 @@ public:
             case WindowType::Gaussian:        data=Gaussian(N,sigma);break;
             case WindowType::Kaiser:          data=Kaiser(N, alpha);break;
             case WindowType::SquareRootHann   data=SquareRootHann(N);break;
+            case WindowType::MLTSine          data=MLTSine(N);break;
             default:                          data=Rectangular(N);
         }
         return data;                          // Return the generated window data.
@@ -309,6 +311,16 @@ public:
         w[n]=std::sqrt(0.5f*(1-std::cos(2*M_PI*n/(N-1))));
       return w;                        // Return our window.
     }                                  // -------------- SquareRootHann ---------- //
+    // Modulated lapped transform (MLT) Sine window. Almost identical to the Square Root Hann,
+    // but affords us some computations in the Block Body Convolver, because it is already
+    // + 1/2 sample advanced and it naturally centers at the hop.
+    inline vector<T> MLTSine(const size_t N)
+    {                                  // ------------- MLTSine ----------------- //
+      vector<T> w(N,T(0));             // Where to store the window.
+      for (size_t n=0;n<N;++n)         // For the length of the window....
+        w[n]=std::sin(M_PI*(n+0.5)/N); // Our MLT Sine window.
+      return w;                        // Return out spectral window.
+    }                                  // ------------- MLTSine ----------------- //
     inline vector<T> Rectangular(const size_t N)
     {
         vector<T> w(N, T(1)); // Rectangular window is all ones.
@@ -321,7 +333,7 @@ public:
       }                     
         return w;
     }
-
+   
    
 private:
     size_t windowsize;
