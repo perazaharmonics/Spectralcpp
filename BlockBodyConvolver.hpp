@@ -117,7 +117,8 @@ namespace dsp::wg
       return; // No IR loaded, just copy input to output.
     }
     if (partIndex==0)
-      std::fill(prevIn.begin(),prevIn.end(),in[0]);
+      //std::fill(prevIn.begin(),prevIn.end(),in[0]);
+      std::fill(prevIn.begin(),prevIn.end(),0.0f);// Start with silence.
     assert (M&&"Prepare() not called"); // Ensure we have a block size.
     // 1. Window input into xTime and zero-pad.
     for (std::size_t n=0;n<M;++n)
@@ -175,6 +176,7 @@ namespace dsp::wg
       // Commented out because the OLA algorithm already holds the history we needed
       // in the previous and next computations.
       outL[n]=wetL;                     // Overwrite, not accumulate.
+      outR[n]=wetR;                     // Overwrite, not accumulate.
       /*outL[n]+=wetL;                    // Overwrite – this is the wet signal
       outR[n]+=wetR;                    // Write the right channel output.
       */
