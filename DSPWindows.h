@@ -304,7 +304,9 @@ public:
     {                                  // -------------- SquareRootHann ---------- //
       vector<T> w(N,T(0));             // Initialize our window.
       for (size_t n=0;n<N;++n)         // For the length of the window....
-    }
+        w[n]=std::sqrt(0.5f*(1-std::cos(2*M_PI*n/(N-1))));
+      return w;                        // Return our window.
+    }                                  // -------------- SquareRootHann ---------- //
     inline vector<T> Rectangular(const size_t N)
     {
         vector<T> w(N, T(1)); // Rectangular window is all ones.
