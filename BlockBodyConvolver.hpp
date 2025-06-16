@@ -172,10 +172,12 @@ namespace dsp::wg
       // ------------------------------ //
       float wetL=yTimeL[n].real()*w0+outOLAL[n];// Overlap-add for left channel.
       float wetR=yTimeR[n].real()*w0+outOLAR[n]; // Overlap-add for right channel.
-      outL[n]+=wetL;                    // Overwrite – this is the wet signal
-      //if (outL[n]>1.0f) outL[n]=1.0f; // Clamp to 1.0f to avoid clipping.
-      //if (outL[n]<-1.0f) outL[n]=-1.0f; // Clamp to -1.0f to avoid clipping.
+      // Commented out because the OLA algorithm already holds the history we needed
+      // in the previous and next computations.
+      outL[n]=wetL;                     // Overwrite, not accumulate.
+      /*outL[n]+=wetL;                    // Overwrite – this is the wet signal
       outR[n]+=wetR;                    // Write the right channel output.
+      */
       //if (outR[n]>1.0f) outR[n]=1.0f; // Clamp to 1.0f to avoid clipping.
       //if (outR[n]<-1.0f) outR[n]=-1.0f; // Clamp to -1.0f to avoid clipping.
       outOLAL[n]=yTimeL[n+M].real()*w1; // Stage next block overlap, windowed.
