@@ -173,25 +173,13 @@ namespace dsp::wg
       // ------------------------------ //
       float wetL=yTimeL[n].real()*w0+outOLAL[n];// Overlap-add for left channel.
       float wetR=yTimeR[n].real()*w0+outOLAR[n]; // Overlap-add for right channel.
-      // Commented out because the OLA algorithm already holds the history we needed
-      // in the previous and next computations.
+      // Given that the OLA algorithm already folds the previous block's tail into outOLAL/outOLAR
+      // We overwrite the value in outL/outR instead of accumulating it. Accumulating it would double
+      // the history every window hop, which is not what we want.
       outL[n]=wetL;                     // Overwrite, not accumulate.
       outR[n]=wetR;                     // Overwrite, not accumulate.
-      /*outL[n]+=wetL;                    // Overwrite – this is the wet signal
-      outR[n]+=wetR;                    // Write the right channel output.
-      */
-      //if (outR[n]>1.0f) outR[n]=1.0f; // Clamp to 1.0f to avoid clipping.
-      //if (outR[n]<-1.0f) outR[n]=-1.0f; // Clamp to -1.0f to avoid clipping.
       outOLAL[n]=yTimeL[n+M].real()*w1; // Stage next block overlap, windowed.
       outOLAR[n]=yTimeR[n+M].real()*w1; // Stage next block overlap, windowed.
-      //  choose a bin inside the passband of the window
-      //const size_t probe = M / 2;          // 128 when M = 256
-      //std::fprintf(stderr,
-      // "wetL[%zu] = %g  wetR[%zu] = %g\n",
-      // probe,
-      // yTimeL[probe].real() * win[probe] + outOLAL[probe],
-      // probe,
-      // yTimeR[probe].real() * win[probe] + outOLAR[probe]);
     }                                   // Done OLA Processing.
     
     // 5. Update the partition index.
