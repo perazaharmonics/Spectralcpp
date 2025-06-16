@@ -34,7 +34,7 @@ public:
         Bartlett,
         Gaussian,
         Kaiser,
-        SquareRootHann
+        VonHann
     };
 
     Window(void)
@@ -112,7 +112,7 @@ public:
             case WindowType::Bartlett:        data=Bartlett(N);break;            
             case WindowType::Gaussian:        data=Gaussian(N,sigma);break;
             case WindowType::Kaiser:          data=Kaiser(N, alpha);break;
-            case WindowType::SquareRootHann   data=SquareRootHann(N);break;
+            case WindowType::VonHann          data=VonHann(N);break;
             default:                          data=Rectangular(N);
         }
         return data;                          // Return the generated window data.
@@ -300,13 +300,15 @@ public:
       }
       return w;                         // Return the Kaiser window.
     }                                   // ------------- Kaiser ------------------ //
-    inline vector<T> SquareRootHann(const size_t N)
-    {                                  // -------------- SquareRootHann ---------- //
+    // From a mathematical perspective, the Hann window is also equivalent to a sine squared
+    // window. So taking the square root we get a sine window. Sqrt(Hann) or VonHann window.
+    inline vector<T> VonHann(const size_t N)
+    {                                  // -------------- VonHann ---------- //
       vector<T> w(N,T(0));             // Initialize our window.
       for (size_t n=0;n<N;++n)         // For the length of the window....
         w[n]=std::sqrt(0.5f*(1-std::cos(2*M_PI*n/(N-1))));
       return w;                        // Return our window.
-    }                                  // -------------- SquareRootHann ---------- //
+    }                                  // -------------- VonHann ---------- //
     inline vector<T> Rectangular(const size_t N)
     {
         vector<T> w(N, T(1)); // Rectangular window is all ones.
