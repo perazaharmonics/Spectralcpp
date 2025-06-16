@@ -556,7 +556,219 @@ protected:
   }
   
 };
+// ----------------------------------------------------------------------------
+// The discrete Cosine Transform (DCT) part of FCWTransforms.h
+// Discrete Cosine / Modified Discrete Cosine Transform. 
+// Supports DCT-I, DCT-II, DCT-III, and DCT-IV (1-D, real-valued).
+// Supports MDCT/IMDCT (Princen-Bradley sine window pair).
+// Uses the existing SpectralOps<T>::FFTStride/IFFTStride for O(N*log(N))
+// No heap allocations inside the hot path (caller passes working buffers).
+// --------------------------------------------------------------------------- 
+template<typename T=float>
+class DCT
+{
+  public:
+    enum class Type { I, II, III, IV,MDCT,IMDCT };
 
+    // ----------- Forward 1-D transforms ----------------------------------- 
+    static vector<T> Transform(
+      const vector<T>& x,               // The input signal to transform.
+      Type t,                           // The transform type.
+      SpectralOps<T>& engine)           // Our spectral engine.
+    {                                   // ----------- Transform -------------
+      switch (t)                        // Act according to transform type...
+      {                                 // 
+        case Type::I:     return DCTI(x,engine); // DCT-I
+        case Type::II:    return DCTII(x,engine); // DCT-II
+        case Type::III:   return DCTIII(x,engine); // DCT-III
+        case Type::IV:    return DCTIV(x,engine); // DCT-IV
+        case Type::MDCT:  return MDCT(x,engine); // MDCT
+        case Type::IMDCT: return IMDCT(x,engine); // IMDCT
+        default:          return DCTIV(x,engine); // Default to DCT-II
+      }                                 // Done dispatching transform          
+    }                                   // ----------- Transform -------------
+    static vector<T> Forward(
+      const vector<T>& timeBlock,       // The time-domain block to transform.
+      const Window<T>& analysisW,       // The analysis window to apply.
+       SpectralOps<T>& engine)          // Our spectral engine.
+    {                                   // ----------- Forward --------------- //
+      return MDCT(timeBlock,analysisW,engine); // Use MDCT for forward transform.
+    }                                   // ----------- Forward --------------- //
+    // ----------- Inverse 1-D transforms -----------------------------------
+    static vector<T> Inverse(
+      const vector<T>& X,               // The frequency-domain block to transform.
+      Type t,                           // The transform type.
+    SpectralOps<T>& engine)             // Our spectral engine.
+    {                                   // ----------- Inverse ----------------
+      switch(t)                         // Dispatch according to type.
+      {                                 //
+        case Type::I:     return DCTI(X,engine,/*inverse=*/true); // DCT-I
+        case Type::II:    return DCTIII(X,engine); // -1 dual
+        case Type::III:   return DCTII(X,engine); // -1 dual
+        case Type::IV:    return DCTIV(X,engine); // Self-inverse
+        default:          return DCTIV(X,engine); // Default to DCT-II
+      }                                 // Done dispatching inverse transform
+    }                                   // ----------- Inverse ----------------
+    static vector<T> Inverse(
+      const vector<T>* coeffs,          // The frequency-domain coefficients to transform.
+      const Window<T>& synthesisW,      // The synthesis window to apply.
+    SpectralOps<T>& engine)             // Our spectral engine.      
+    {                                   // ----------- Inverse ----------------
+      return IMDCT(coeffs,synthesisW,engine); // Use IMDCT for inverse transform.
+    }                                   // ----------- Inverse ----------------
+    // ---------------- Discrete Cosine Transforms ----------------
+    // All four classical DCTs are computed through a single length-2N complex FFT.
+    // following the well-known even/odd embeddings (see Britanak & Rao, ch. 6).
+    // We use the existing SpectralOps<T>::FFTStride/IFFTStride for O(N*log(N))
+    // So no extra radix-2 code is duplicated here.
+    // 
+    static vector<T> DCTII(
+      const vector<T>& x,               // The input signal to transform.
+      SpectralOps<T>& engine,           // Our spectral engine.
+      const bool inverse=false)         // If it is the inverse.           
+    {                                   // ----------- DCT-II ----------------
+      const size_t N=x.size();          // Get the size of the input signal.
+      vector<std::complex<T>> w(2*N);     // Create a complex vector of size 2*N.
+      // Even-symmetrical extensions (x, reversed(x))
+      for (size_t n=0;n<N;++n)          // For all samples.
+      {                                 // Set the even-symmetrical extensions.
+        w[n]={x[n],0};                  // Fill the first N points with x[n].
+        w[2*N-1-n]={x[n],0};            // Fill the last N points with x[n].
+      }                                 // Done symmetrical extensions.
+      // Compute the FFT of the complex vector w.
+      auto W=engine.FFTStride(w);       // Compute the FFT of the complex vector w.
+      // Post-twiddle & packing.
+      vector<T> X(N);                   // Create a vector of size N for the output.
+      const T scale=inverse?2./N:1.;    // Orthonormal pair (II <--> III).
+      const T factor=M_PI/(2.*N);       // The factor to apply to the output.
+      for (size_t k=0;k<N;++k)          // For all frequency bins...
+      {                                 // Apply the post-twiddle and scale/pack.
+        std::complex<T> c=std::exp(std::complex<T>(0,-factor*k));
+        X[k]=2*(W[k]*c).real()*scale;   // Apply the post-twiddle and scale.
+      }                                 // Done post-twiddle and packing.
+      return X;                         // Return the DCT-II coefficients.
+    }                                   // ----------- DCT-II ----------------
+    static std::vector<T> DCTIII(
+      const std::vector<T>& x,          // The input signal to transform.
+      SpectralOps<T>& engine)           // Our spectral engine.
+    {                                   // ----------- DCT-III ---------------
+      // DCT-III is the inverse of DCT-II. Call DCTII with the inverse flag
+      return DCTII(x,engine,true);      // Call DCT-II with the inverse flag.
+    }                                   // ----------- DCT-III ---------------
+    static vector<T> DCTI(
+      const std::vector<T>& x,          // The input signal to transform.
+      SpectralOps<T>& engine,           // Our spectral engine.
+      const bool inverse=false)         // If it is the inverse.
+    {                                   // ----------- DCT-I -----------------
+      // Even-even extensions --> length-2(N-1) FFT.
+      const size_t N=x.size();          // Get the size of the input signal.
+      if (N<2) return x;                // If the input signal is too short, return it.
+      vector<std::complex<T>> w(2*(N-1)); // Create a complex vector of size 2*(N-1).
+      // Fill the complex vector with the even-even extensions.
+      for (size_t n=0;n<N-1;++n)        // For all samples.
+      {                                 // Set the even-even extensions.
+        w[n]={x[n],0};                  // Fill the first N-1 points with x[n].
+        w[2*(N-1)-1-n]={x[N-2-n],0};    // Fill the last N-1 points with x[N-2-n].
+      }                                 // Done even-even extensions.
+      w[N-1]={x.back(),0};              // Fill the middle point with x[N-1].
+      auto W=engine.FFTStride(w);       // Compute the FFT of the complex vector w.
+      vector<T> X(N);                   // Create a vector of size N for the output.
+      const T scale=inverse?1./(N-1):1.; // Orthonormal pair (I <--> IV).
+      for (size_t k=0;k<N;++k)          // For all frequency bins...
+        X[k]=W[k].real()*scale;         // Apply the post-twiddle and scale.
+      return X;                         // Return the DCT-I coefficients.
+    }                                   // ----------- DCT-I -----------------
+    static vector<T> DCTIV(
+      const vector<T>& x,               // The input signal to transform.
+      SpectralOps<T>& engine)           // Our spectral engine.
+    {                                   // ----------- DCT-IV ----------------
+      const size_t N=x.size();          // Get the size of the input signal.
+      vector<std::complex<T>> w(2*N); // Create a complex vector of size 2*N.
+      // Fill the complex vector with the even-even extensions.
+      for (size_t n=0;n<N;++n)          // For all samples...
+      {
+        w[n]={x[n],0};                  // Fill the first N points with x[n].
+        w[2*N-1-n]={-x[n],0};           // Fill the last N points with -x[n].
+      }                                 // Done symmetrical extensions.
+      auto W=engine.FFTStride(w);       // Compute the FFT of the complex vector w.
+      vector<T> X(N);                   // Create a vector of size N for the output.
+      const T factor=M_PI/(4.*N);       // The factor to apply to the output.
+      for (size_t k=0;k<N;++k)          // For all frequency bins....
+      {                                 
+        std::complex<T> c=std::exp(std::complex<T>(0,-factor*(2*k+1)));
+        X[k]=2*(W[k].real()*c.real()-W[k].imag()*c.imag());// Apply the post-twiddle and scale.
+      }                                 // Done post-twiddle and packing.
+      return X;                         // Self-inverse (orthogonal, no extra scaling).
+    }                                   // ----------- DCT-IV ----------------
+  // --------------------- MDCT/IMDCT ---------------------
+  // MDCT length is N (produces N/2 coefficients from a 2N-sample block).
+  // IMDCT returns a 2N block that the caller overlap-adds by N samples.
+  // -----------------------------------------------------------
+  static vector<T> MDCT(
+    const vector<T>& timeBlock,         // The time-domain block to transform.
+    const Window<T>& win,               // The window to apply before MDCT.
+    SpectralOps<T>& engine)             // Our spectral engine.
+  {                                     // ------------ MDCT ---------------
+    // Preconditions:
+    const size_t n2=timeBlock.size();   // Get the size of the input block.
+    if (n2%2)                           // If a remainder appears after division by 2....
+      return vector<T>();               // Return an empty vector.
+    const size_t N=n2/2;                // N is the number of MDCT coefficients.
+    // -------------------------------- //
+    // Windowing + pre-twiddle (+ phase shift n+0.5).
+    // -------------------------------- //
+    vector<std::complex<T>> xwin(n2);   // Create a complex vector of size n2.
+    for (size_t n=0;n<n2;++n)           // Fpr all samples...
+      xwin[n]={timeBlock[n]*win[n],0}; // Apply the window to the time block.
+    // -------------------------------- //
+    // Rearrange into even-odd groups for FFT of length 2N.
+    // -------------------------------- //
+    vector<std::complex<T>> v(n2);      //  Create a complex vector of size n2.
+    for (size_t n=0;n<N;++n)            // For all samples....
+    {                                   // Fill the complex vector with the even-odd groups.
+      v[n]=xwin[n]+xwin[n2-1-n];        // Even part: x[n]+w[n2-1-n].
+      v[n+N]=(xwin[n]-xwin[n2-1-n])*std::complex<T>{0,-1};     // Odd part: x[n]-w[n2-1-n].
+    }                                   //
+    auto V=engine.FFTStride(v);         // Compute the FFT of the complex vector v.
+    // Post-twiddle: take real part, multiply by exp(-j(pi*k+0.5)/N)                                                
+    vector<T> X(N);                    // Create a vector of size N for the output.
+    const T factor=M_PI/(2.*N);         // The factor to apply to the output.
+    for (size_t k=0;k<N;++k)            // For all frequency bins...
+    {                                   // Apply the post-twiddle and scale.
+      std::complex<T> c=std::exp(std::complex<T>(0,-factor*(k+0.5)));
+      X[k]=(V[k]*c).real();             // Take the real part and apply the post-twiddle.
+    }                                   // Done post-twiddle and packing.
+    return X;                           // Return the MDCT coefficients.
+  }                                     // ------------ MDCT ---------------
+  static vector<T> IMDCT(
+    const vector<T>& X,                 // The frequency-domain block to transform.
+    const Window<T>& win,               // The window to apply after IMDCT.
+    SpectralOps<T>& engine)             // Our spectral engine.
+  {                                     // ------------ IMDCT ---------------
+    const size_t N=X.size();            // Get the size of the input block.
+    const size_t n2=N*2;                //
+    // Pre-twiddle
+    vector<std::complex<T>> V(n2);      // Create a complex vector of size n2.
+    const T factor=M_PI/(2.*N);         // The factor to apply to the output.
+    for (size_t k=0;k<N;++k)            // For all frequency bins....
+    {
+      std::complex<T> c=std::exp(std::complex<T>(0,factor*(k+0.5)));
+      V[k]=X[k]*c;                      // Apply the pre-twiddle.
+      V[k+N]=-X[k]*c;                   // odd symmetry: V[k+N]=-X[k]*c.
+    }                                   // 
+    // IFFT but actua;;y FFT of size 2N, then scale/flip.
+    auto v=engine.IFFTStride(V);        // Compute the IFFT of the complex vector V.
+    // Post-twiddle + windowing.
+    vector<T> y(n2);                     // Output signal.
+    for (size_t n=0;n<n2;++n)           // For all samples...
+      y[n]=2*(v[(n+N/2)%n2].real())*win[n]; // Apply the post-twiddle and windowing.
+    return y;           // Caller must perform 50% OLA with previous frame (block).
+  }                                     // ------------ IMDCT ---------------
+};  
+
+
+
+// The Fourier part of FCWTransforms.h
 template<typename T>
 class SpectralOps
 {
@@ -740,9 +952,97 @@ inline void ForwardButterfly(vector<T> &last, vector<T> &curr, const vector<T> &
     // ------------------------------------- //  
   ForwardButterfly(curr, last, twiddles, rot + 1, nBits); // Recurse to the next stage.
 }
+template<typename U>
+inline void ForwardButterfly(
+  vector<std::complex<U>>& last,
+  vector<std::complex<U>>& curr,
+  const vector<std::complex<U>>& twiddles,
+  int rot,int nBits)
+{
+  if (rot==nBits) return;
+  const int sect=1<<(rot+1);            // Size of the butterfly section.
+  const int phases=last.size()/sect;    // Number of sections the signal is divided into.
+  for (int i=0;i<phases;++i)            // For every phase in the FFT
+  {                                      // Perform the butterfly operation.
+    const int base=i*sect;               // Base index for the current phase.
+    for (int j=0;j<sect/2;++j)           // For every butterfly group in the structure.
+    {
+      const int evenNdx=base+j;          // Even index in the butterfly group.
+      const int oddNdx=base+sect/2+j;    // Odd index in the butterfly group.
+      last[oddNdx]*=twiddles[j*phases];  // Multiply the odd index by the twiddles factor.
+      curr[evenNdx]=last[evenNdx]+last[oddNdx]; // Compute the even index.
+      curr[oddNdx]=last[evenNdx]-last[oddNdx];  // Compute the odd index.
+    }                                    // Done with all butterfly groups.
+  }                                      // Done with all phases.
+  ForwardButterfly(curr, last, twiddles, rot + 1, nBits); // Recurse to the next stage.
+}
 // Bit reversal permutation for the Cooley-Tukey FFT algorithm.
 
 inline void  BitReversal(vector<T> &s, const int nBits)
+{
+    // -------------------------------- //
+    // Base Case: If the input size is <=2, no permutation necessary
+    // For very small signals, bit reversal is not needed.
+    // -------------------------------- //
+  if (s.size()<=2)                      // Only two or less samples?
+    return;                             // Yes, so no need to reverse bits.
+    // -------------------------------- //
+    // Special Case: If the input is exactly 4 samples, swap the middle
+    // two elements. Handle the 2-bit case directly.
+    // -------------------------------- //
+  if (s.size()==4)                      // Is the signal exactly 4 samples?
+  {                                     // Yes, so swap the middle two elements.
+    swap(s[1], s[2]);                   // Swap the middle two elements.
+    return;                             // Done with the bit reversal.
+  }
+    // -------------------------------- //
+    // General Case: For signals larger than 4 samples, perform bit reversal.
+    // Initialize a vector to hold bit-reversed indices and compute the bit
+    // reversed indices for the FFT.
+    // -------------------------------- //
+  vector<int> revNdx(s.size());         // Vector to hold bit-reversed indices.
+    // -------------------------------- //
+    // Manually set the first 4 indices' bit-reversed values.
+    // These are the known bit reversed values for the 2-bit case.
+    // -------------------------------- //
+  revNdx[0]=0;                          // Bit-reversed index for 0 is 0.
+  revNdx[1]=1<<(nBits-1);               // == 100...0 in binary == 2^(nBits-1).
+  revNdx[2]=1<<(nBits-2);               // == 010...0 in binary == 2^(nBits-2).
+  revNdx[3]=revNdx[1]+revNdx[2];        // == 110...0 in binary == 2^(nBits-1) + 2^(nBits-2).
+    // -------------------------------- //
+    // Loop through to  compute the rest of the bit-reversed indices.
+    // the bit-reversed index is the reverse of the binary representation of the index.
+    // -------------------------------- //
+    // Theorem: For all nk=2^k-1 where k<= nBits, 
+    // revNdx[nk]=revNdx[n(k-1)]+2^(nBits-k)
+    // revNdx[nk-i]=revNdx[nk]-revNdx[i]
+    // -------------------------------- //
+  for (int k=3; k<=nBits;++k)           // For all remaining bits in the signal.
+  {
+    const int nk=(1<<k)-1;              // Compute nk=2^k-1.
+    const int nkmin1=(1<<(k-1))-1;      // Compute n(k-1)=2^(k-1)-1.
+    // -------------------------------- //
+    // Derive the bit-reversed index for nk using the bit reversal of n(k-1).
+    // The bit-reversed index for nk is the bit-reversed index for n(k-1) plus 2^(nBits-k).
+    // -------------------------------- //
+    revNdx[nk]=revNdx[nkmin1]+(1<<(nBits-k)); // Compute revNdx[nk].
+    // -------------------------------- //
+    // Loop to compute the remaining bit reversed indices.
+    // Compute for the range nk -i using nk and previously computed values.
+    // -------------------------------- //
+    for (int i=1; i<=nkmin1;++i)        // For the range nk-i.
+      revNdx[nk-i]=revNdx[nk]-revNdx[i]; // Compute revNdx[nk-i].
+  }
+    // -------------------------------- //
+    // Permute the signal using the bit-reversed indices.
+    // Swap elements if the bit-reversed index is greater than the current index.
+    //--------------------------------- //
+  for (int i=0; i<s.size();++i)         // For all elements in the signal.
+    if (i<revNdx[i])                    // If the index is less than the bit-reversed index.
+      swap(s[i], s[revNdx[i]]);         // Swap the elements.             
+}                                       // End of the function.
+// Overloaded for complex vectors.
+inline void  BitReversal(vector<std::complex<T>> &s, const int nBits)
 {
     // -------------------------------- //
     // Base Case: If the input size is <=2, no permutation necessary
@@ -936,7 +1236,7 @@ inline std::pair<vector<complex<T>>,vector<vector<complex<T>>>> FFTStrideEig(con
   // Perform the bit reversal permutation on the input signal.
   // This reorders the input signal to prepare for the Cooley-Tukey FFT.
   // ---------------------------------- //
-  BitReversePermutation(last, NBits);   // Perform bit reversal permutation.
+  BitReversal(last, NBits);   // Perform bit reversal permutation.
   // ---------------------------------- //
   // Perform the FFT butterfly operation for the Cooley-Tukey FFT.
   // This computes the FFT in-place using the last and current buffers.
@@ -999,7 +1299,7 @@ inline vector<complex<T>> FFTStride (const vector<complex<T>> &s)
     // Perform the bit reversal permutation on the input signal.
     // This reorders the input signal to prepare for the Cooley-Tukey FFT.
     // ---------------------------------- //
-    BitReversePermutation(last, nBits);   // Perform bit reversal permutation.
+    BitReversal(last, nBits);   // Perform bit reversal permutation.
     // ---------------------------------- //
     // Perform the FFT butterfly operation for the Cooley-Tukey FFT.
     // This computes the FFT in-place using the last and current buffers.
