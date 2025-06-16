@@ -113,8 +113,8 @@ public:
             case WindowType::Bartlett:        data=Bartlett(N);break;            
             case WindowType::Gaussian:        data=Gaussian(N,sigma);break;
             case WindowType::Kaiser:          data=Kaiser(N, alpha);break;
-            case WindowType::SquareRootHann   data=SquareRootHann(N);break;
-            case WindowType::MLTSine          data=MLTSine(N);break;
+            case WindowType::SquareRootHann:  data=SquareRootHann(N);break;
+            case WindowType::MLTSine:         data=MLTSine(N);break;
             default:                          data=Rectangular(N);
         }
         return data;                          // Return the generated window data.
