@@ -55,7 +55,7 @@ namespace dsp
   }
   inline void Reset(void) noexcept
   {
-    z1=z2=T(0);
+    this->z1=z2=T(0);
   }
   //! Process one sample
   T ProcessSample(T x) noexcept
@@ -132,7 +132,7 @@ namespace dsp
   } // Get the cutoff frequency.
   inline void SetQualityFactor(double q) noexcept
   {
-    Q = q; // Set the quality factor.
+    this->Q = q; // Set the quality factor.
   } // Set the quality factor.
   inline double GetQualityFactor(void) const noexcept
   {
